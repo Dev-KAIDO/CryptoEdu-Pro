@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+
+# PyInstaller
+*.spec
+
+# OS
+.DS_Store
+Thumbs.db
+# Nested repository
+/How-Cyber-Text-or-Data/
