@@ -5,13 +5,27 @@ import re
 
 class CryptoCore:
     """النواة الأساسية لخوارزميات التشفير"""
+
+    @staticmethod
+    def _require_latin_text(text, field="النص"):
+        """ترفض الأحرف غير اللاتينية بدل تحويلها إلى نتائج خاطئة بصمت."""
+        if any(char.isalpha() and not ("A" <= char.upper() <= "Z") for char in text):
+            raise ValueError(f"{field} يجب أن يحتوي على أحرف إنجليزية فقط")
+
+    @staticmethod
+    def _require_latin_key(key, algorithm):
+        key = key.strip()
+        if not key or not key.isascii() or not key.isalpha():
+            raise ValueError(f"مفتاح {algorithm} يجب أن يحتوي على أحرف إنجليزية فقط")
+        return key.upper()
     
     @staticmethod
     def caesar_encrypt(text, key):
         """شفرة قيصر: إزاحة كل حرف بمقدار المفتاح"""
+        CryptoCore._require_latin_text(text)
         result = ""
         for char in text.upper():
-            if char.isalpha():
+            if "A" <= char <= "Z":
                 result += chr((ord(char) - 65 + key) % 26 + 65)
             else:
                 result += char
@@ -44,11 +58,12 @@ class CryptoCore:
     @staticmethod
     def affine_encrypt(text, m, k):
         """شفرة أفاين: (m * x + k) mod 26"""
+        CryptoCore._require_latin_text(text)
         if math.gcd(m, 26) != 1:
             raise ValueError("يجب أن يكون المفتاح m أولي مع 26")
         result = ""
         for char in text.upper():
-            if char.isalpha():
+            if "A" <= char <= "Z":
                 x = ord(char) - 65
                 result += chr((m * x + k) % 26 + 65)
             else:
@@ -57,12 +72,13 @@ class CryptoCore:
 
     @staticmethod
     def affine_decrypt(text, m, k):
+        CryptoCore._require_latin_text(text)
         inv = CryptoCore.mod_inverse(m, 26)
         if inv is None:
             raise ValueError("لا يوجد معكوس ضربي للمفتاح m")
         result = ""
         for char in text.upper():
-            if char.isalpha():
+            if "A" <= char <= "Z":
                 y = ord(char) - 65
                 result += chr((inv * (y - k)) % 26 + 65)
             else:
@@ -72,12 +88,13 @@ class CryptoCore:
     @staticmethod
     def vigenere_encrypt(text, key):
         """شفرة فيجينير: إزاحة دورية بناءً على كلمة مفتاحية"""
+        CryptoCore._require_latin_text(text)
+        key = CryptoCore._require_latin_key(key, "Vigenère")
         text = text.upper()
-        key = key.upper()
         result = ""
         key_idx = 0
         for char in text:
-            if char.isalpha():
+            if "A" <= char <= "Z":
                 shift = ord(key[key_idx % len(key)]) - 65
                 result += chr((ord(char) - 65 + shift) % 26 + 65)
                 key_idx += 1
@@ -87,12 +104,13 @@ class CryptoCore:
 
     @staticmethod
     def vigenere_decrypt(text, key):
+        CryptoCore._require_latin_text(text)
+        key = CryptoCore._require_latin_key(key, "Vigenère")
         text = text.upper()
-        key = key.upper()
         result = ""
         key_idx = 0
         for char in text:
-            if char.isalpha():
+            if "A" <= char <= "Z":
                 shift = ord(key[key_idx % len(key)]) - 65
                 result += chr((ord(char) - 65 - shift) % 26 + 65)
                 key_idx += 1
@@ -103,11 +121,11 @@ class CryptoCore:
     @staticmethod
     def playfair_matrix(key):
         """بناء مصفوفة بلايفير 5x5"""
-        key = key.upper().replace("J", "I").replace(" ", "")
+        key = CryptoCore._require_latin_key(key, "Playfair").replace("J", "I")
         matrix = []
         seen = set()
         for char in key + "ABCDEFGHIKLMNOPQRSTUVWXYZ":
-            if char not in seen and char.isalpha():
+            if char not in seen and "A" <= char <= "Z":
                 matrix.append(char)
                 seen.add(char)
         return [matrix[i:i+5] for i in range(0, 25, 5)]
@@ -115,8 +133,12 @@ class CryptoCore:
     @staticmethod
     def playfair_encrypt(text, key):
         """شفرة بلايفير: تشفير أزواج الحروف باستخدام شبكة 5x5"""
+        CryptoCore._require_latin_text(text)
+        if any(not (char.isalpha() or char.isspace()) for char in text):
+            raise ValueError("نص Playfair يجب أن يحتوي على أحرف ومسافات فقط")
         matrix = CryptoCore.playfair_matrix(key)
         text = text.upper().replace("J", "I").replace(" ", "")
+        text = "".join(char for char in text if "A" <= char <= "Z")
         
         # تجهيز النص لأزواج
         prepared = ""
@@ -158,7 +180,13 @@ class CryptoCore:
     @staticmethod
     def playfair_decrypt(text, key):
         """فك تشفير بلايفير"""
+        CryptoCore._require_latin_text(text, "النص المشفر")
+        if any(not (char.isalpha() or char.isspace()) for char in text):
+            raise ValueError("نص Playfair المشفر يجب أن يحتوي على أحرف ومسافات فقط")
         matrix = CryptoCore.playfair_matrix(key)
+        text = text.upper().replace(" ", "")
+        if len(text) % 2:
+            raise ValueError("نص Playfair المشفر يجب أن يتكون من عدد زوجي من الأحرف")
         
         def find_pos(char):
             for r in range(5):
@@ -186,22 +214,27 @@ class CryptoCore:
     @staticmethod
     def hill_matrix(key):
         """بناء مصفوفة المفتاح 2x2 من كلمة مفتاحية أو أرقام"""
-        key = key.upper().replace(" ", "")
-        if len(key) >= 4 and key.isdigit() == False:
-            matrix = []
-            for char in key[:4]:
-                matrix.append(ord(char) - 65)
-            return [[matrix[0], matrix[1]], [matrix[2], matrix[3]]]
+        key = key.strip().upper()
+        if len(key) == 4 and key.isascii() and key.isalpha():
+            nums = [ord(char) - 65 for char in key]
         else:
-            nums = [int(x) for x in key.split(",")]
-            return [[nums[0], nums[1]], [nums[2], nums[3]]]
+            try:
+                nums = [int(value.strip()) for value in key.split(",")]
+            except (TypeError, ValueError):
+                raise ValueError("مفتاح Hill يجب أن يكون 4 أحرف أو 4 أرقام مفصولة بفواصل") from None
+            if len(nums) != 4:
+                raise ValueError("مفتاح Hill يجب أن يحتوي على 4 قيم بالضبط")
+        return [[nums[0] % 26, nums[1] % 26], [nums[2] % 26, nums[3] % 26]]
 
     @staticmethod
     def hill_encrypt(text, key):
         """شفرة هيل: تشفير باستخدام ضرب المصفوفات mod 26"""
         matrix = CryptoCore.hill_matrix(key)
+        CryptoCore._require_latin_text(text)
+        if any(not (char.isalpha() or char.isspace()) for char in text):
+            raise ValueError("نص Hill يجب أن يحتوي على أحرف ومسافات فقط")
         text = text.upper().replace(" ", "")
-        text = ''.join(c for c in text if c.isalpha())
+        text = ''.join(c for c in text if "A" <= c <= "Z")
 
         if len(text) % 2 != 0:
             text += "X"
@@ -219,6 +252,9 @@ class CryptoCore:
     def hill_decrypt(text, key):
         """فك تشفير هيل: استخدام المصفوفة العكسية mod 26"""
         matrix = CryptoCore.hill_matrix(key)
+        CryptoCore._require_latin_text(text, "النص المشفر")
+        if any(not (char.isalpha() or char.isspace()) for char in text):
+            raise ValueError("نص Hill المشفر يجب أن يحتوي على أحرف ومسافات فقط")
         det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
         inv_det = CryptoCore.mod_inverse(det, 26)
         if inv_det is None:
@@ -230,6 +266,8 @@ class CryptoCore:
         ]
 
         text = text.upper().replace(" ", "")
+        if len(text) % 2:
+            raise ValueError("نص Hill المشفر يجب أن يتكون من عدد زوجي من الأحرف")
         result = ""
         for i in range(0, len(text), 2):
             c1 = ord(text[i]) - 65
@@ -250,10 +288,10 @@ class CryptoCore:
     def diffie_hellman_exchange(p, g, a, b, lang="AR"):
         if not CryptoCore.is_prime(p):
             raise ValueError("العدد p يجب أن يكون أولياً" if lang == "AR" else "Number p must be prime")
-        if g >= p:
-            raise ValueError("المولد g يجب أن يكون أصغر من p" if lang == "AR" else "Generator g must be less than p")
-        if a >= p or b >= p:
-            raise ValueError("المفاتيح الخاصة يجب أن تكون أصغر من p" if lang == "AR" else "Private keys must be less than p")
+        if not (1 < g < p):
+            raise ValueError("المولد g يجب أن يكون بين 2 و p-1" if lang == "AR" else "Generator g must be between 2 and p-1")
+        if not (0 < a < p and 0 < b < p):
+            raise ValueError("المفاتيح الخاصة يجب أن تكون موجبة وأصغر من p" if lang == "AR" else "Private keys must be positive and less than p")
 
         A = pow(g, a, p)
         B = pow(g, b, p)
@@ -269,11 +307,12 @@ class CryptoCore:
     def dh_encrypt(text, p, g, a, b, lang="AR"):
         """تبادل مفاتيح ديفي-هيلمان + تشفير فعلي للنص بالمفتاح المشترك.
         يُشتقّ المفتاح المشترك ثم يُستعمل كإزاحة (shift) لكل حرف ليعطي ناتج مشفّر حقيقي."""
+        CryptoCore._require_latin_text(text)
         ka = int(CryptoCore.diffie_hellman_exchange(p, g, a, b, lang))
         shift = (ka % 26) if (ka % 26) != 0 else 26
         result = ""
         for ch in text.upper():
-            if ch.isalpha():
+            if "A" <= ch <= "Z":
                 result += chr((ord(ch) - 65 + shift) % 26 + 65)
             else:
                 result += ch
@@ -281,12 +320,13 @@ class CryptoCore:
 
     @staticmethod
     def dh_decrypt(text, p, g, a, b, lang="AR"):
-        """عكس dh_encrypt: يُشتقّ نفس المفتاح المشترك ويُعكَس إزاحة كل حرف لاسترجاع النص الأصلي."""
+        """عكس dh_encrypt: يُشتق نفس المفتاح المشترك ويُعكَس إزاحة كل حرف لاسترجاع النص الأصلي."""
+        CryptoCore._require_latin_text(text, "النص المشفر")
         ka = int(CryptoCore.diffie_hellman_exchange(p, g, a, b, lang))
         shift = (ka % 26) if (ka % 26) != 0 else 26
         result = ""
         for ch in text.upper():
-            if ch.isalpha():
+            if "A" <= ch <= "Z":
                 result += chr((ord(ch) - 65 - shift) % 26 + 65)
             else:
                 result += ch
@@ -296,8 +336,14 @@ class CryptoCore:
     def rsa_encrypt(text, p, q, e, lang="AR"):
         if not CryptoCore.is_prime(p) or not CryptoCore.is_prime(q):
             raise ValueError("يجب أن تكون الأعداد p و q أولية" if lang == "AR" else "Numbers p and q must be prime")
+        if p == q:
+            raise ValueError("يجب أن يكون p و q عددين أوليين مختلفين" if lang == "AR" else "p and q must be distinct primes")
+        if e <= 1:
+            raise ValueError("يجب أن يكون e أكبر من 1" if lang == "AR" else "e must be greater than 1")
         n = p * q
         phi = (p - 1) * (q - 1)
+        if e >= phi:
+            raise ValueError("يجب أن يكون e أصغر من phi" if lang == "AR" else "e must be less than phi")
         if math.gcd(e, phi) != 1:
             raise ValueError(f"الأس e ({e}) يجب أن يكون أولياً نسبياً مع phi ({phi})" if lang == "AR" else f"Exponent e ({e}) must be coprime to phi ({phi})")
 
@@ -305,6 +351,8 @@ class CryptoCore:
         if d is None:
             raise ValueError("لا يوجد معكوس ضربي لـ e مع phi" if lang == "AR" else "No modular inverse for e modulo phi")
 
+        if any(ord(char) >= n for char in text):
+            raise ValueError("كل قيمة حرف يجب أن تكون أصغر من n" if lang == "AR" else "Every character value must be less than n")
         cipher_nums = [pow(ord(char), e, n) for char in text]
         return ",".join(str(c) for c in cipher_nums)
 
@@ -312,8 +360,14 @@ class CryptoCore:
     def rsa_decrypt(text, p, q, e, lang="AR"):
         if not CryptoCore.is_prime(p) or not CryptoCore.is_prime(q):
             raise ValueError("الأعداد p و q يجب أن تكون أولية" if lang == "AR" else "Numbers p and q must be prime")
+        if p == q:
+            raise ValueError("يجب أن يكون p و q عددين أوليين مختلفين" if lang == "AR" else "p and q must be distinct primes")
+        if e <= 1:
+            raise ValueError("يجب أن يكون e أكبر من 1" if lang == "AR" else "e must be greater than 1")
         n = p * q
         phi = (p - 1) * (q - 1)
+        if e >= phi:
+            raise ValueError("يجب أن يكون e أصغر من phi" if lang == "AR" else "e must be less than phi")
         d = CryptoCore.mod_inverse(e, phi)
         if d is None:
             raise ValueError("لا يوجد معكوس ضربي لـ e مع phi" if lang == "AR" else "No modular inverse for e modulo phi")
@@ -322,6 +376,8 @@ class CryptoCore:
         nums = [int(x) for x in re.findall(r'\d+', text)]
         if not nums:
             raise ValueError("لم يتم العثور على أرقام صالحة لفك التشفير" if lang == "AR" else "No valid ciphertext numbers found")
+        if any(number < 0 or number >= n for number in nums):
+            raise ValueError("أرقام RSA يجب أن تكون بين 0 و n-1" if lang == "AR" else "RSA values must be between 0 and n-1")
 
         decrypted_chars = [chr(pow(c, d, n)) for c in nums]
         return "".join(decrypted_chars)

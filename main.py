@@ -2942,8 +2942,8 @@ class CryptoApp(ctk.CTk):
                     "EN": ("\u25b6\ufe0f Execution Output Example", "Public: p=23, g=5 | KAIDO (a=6) \u2794 A=8 | ALEX (b=15) \u2794 B=19\nShared Secret: s_kaido = 19^6 mod 23 = 2 | s_alex = 8^15 mod 23 = 2")
                 },
                 "RSA": {
-                    "AR": ("\u25b6\ufe0f \u0645\u062e\u0631\u062c\u0627\u062a \u062a\u0634\u063a\u064a\u0644 \u062a\u062c\u0631\u064a\u0628\u064a\u0629 (Run Output)", "Keys: p=61, q=53, e=17 \u2794 n=3233, \u03c6(n)=3120, d=2753\nrsa_encrypt('HI', 61, 53, 17)  \u2794  [1053, 726]\nrsa_decrypt([1053, 726], 61, 53, 2753)  \u2794  'HI'"),
-                    "EN": ("\u25b6\ufe0f Execution Output Example", "Keys: p=61, q=53, e=17 \u2794 n=3233, \u03c6(n)=3120, d=2753\nrsa_encrypt('HI', 61, 53, 17)  \u2794  [1053, 726]\nrsa_decrypt([1053, 726], 61, 53, 2753)  \u2794  'HI'")
+                    "AR": ("\u25b6\ufe0f \u0645\u062e\u0631\u062c\u0627\u062a \u062a\u0634\u063a\u064a\u0644 \u062a\u062c\u0631\u064a\u0628\u064a\u0629 (Run Output)", "Keys: p=61, q=53, e=17 \u2794 n=3233, \u03c6(n)=3120, d=2753\nrsa_encrypt('HI', 61, 53, 17)  \u2794  [3000, 1486]\nrsa_decrypt([3000, 1486], 61, 53, 17)  \u2794  'HI'"),
+                    "EN": ("\u25b6\ufe0f Execution Output Example", "Keys: p=61, q=53, e=17 \u2794 n=3233, \u03c6(n)=3120, d=2753\nrsa_encrypt('HI', 61, 53, 17)  \u2794  [3000, 1486]\nrsa_decrypt([3000, 1486], 61, 53, 17)  \u2794  'HI'")
                 },
                 "SDES": {
                     "AR": ("\u25b6\ufe0f \u0645\u062e\u0631\u062c\u0627\u062a \u062a\u0634\u063a\u064a\u0644 \u062a\u062c\u0631\u064a\u0628\u064a\u0629 (Run Output)", "sdes_encrypt('10101101', key='1010110011')  \u2794  '00111100'\nsdes_decrypt('00111100', key='1010110011')  \u2794  '10101101'"),
