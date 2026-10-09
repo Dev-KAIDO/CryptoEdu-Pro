@@ -209,6 +209,7 @@ CryptoEdu-Pro/
 ├── main.py                 # نقطة التشغيل وواجهة التطبيق الرئيسية
 ├── core/
 │   ├── algorithms.py       # تنفيذ الخوارزميات ومواد الشرح
+│   ├── service.py          # طبقة تنفيذ مستقلة عن واجهة المستخدم
 │   └── textutils.py        # أدوات معالجة اتجاه النص المختلط
 ├── ui/
 │   ├── styles.py           # الألوان والخطوط والأحجام
@@ -216,6 +217,7 @@ CryptoEdu-Pro/
 │   └── widgets.py          # مكونات واجهة قابلة لإعادة الاستخدام
 ├── tests/
 │   └── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
+│   └── test_service.py      # اختبارات طبقة تنفيذ العمليات
 ├── CryptoEdu.spec          # إعداد بناء PyInstaller
 ├── cryptoedu.ico           # أيقونة التطبيق
 ├── requirements.txt        # الاعتماديات
@@ -229,12 +231,13 @@ flowchart LR
     A[واجهة CryptoEdu Pro] --> B[إدارة اللغة والثيم]
     A --> C[تبويب التشفير العملي]
     A --> D[تبويب شرح الكود والتحليل]
-    C --> E[CryptoCore]
-    E --> F[Classical Ciphers]
-    E --> G[RSA / Diffie-Hellman]
-    E --> H[S-DES / DES]
-    D --> E
-    A --> I[السجل و Quick Test]
+    C --> E[CryptoOperationService]
+    E --> F[CryptoCore]
+    F --> G[Classical Ciphers]
+    F --> H[RSA / Diffie-Hellman]
+    F --> I[S-DES / DES]
+    D --> F
+    A --> J[السجل و Quick Test]
 ```
 
 ### ملاحظة عن ملفات الإصلاح القديمة
@@ -290,6 +293,8 @@ pyinstaller CryptoEdu.spec
 - [x] تصحيح مثال RSA داخل واجهة شرح الكود ليطابق الناتج الفعلي.
 - [x] توحيد مساري التشفير وفك التشفير في معالج واحد داخل الواجهة.
 - [x] توحيد نص عداد العمليات عبر ملفات الترجمة بدل النصوص الثابتة.
+- [x] فصل اختيار الخوارزمية وقراءة المفاتيح في `core/service.py` بعيدًا عن Tkinter.
+- [x] إضافة اختبارات مباشرة لطبقة الخدمة، ليصبح إجمالي الاختبارات 21 اختبارًا.
 
 ---
 

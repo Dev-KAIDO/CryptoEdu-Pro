@@ -11,6 +11,7 @@ from tkinter import messagebox
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.algorithms import CryptoCore
+from core.service import CryptoOperationService
 from core.textutils import fix_bidi
 from ui.translations import TRANSLATIONS
 
@@ -2534,6 +2535,10 @@ class CryptoApp(ctk.CTk):
 
     def update_keys(self):
         T = self._T
+        # إزالة مراجع الحقول القديمة قبل إعادة بناء حقول الخوارزمية الجديدة.
+        # وجود مرجع Tkinter قديم يجعل hasattr ينجح رغم أن العنصر دُمّر فعليًا.
+        for index in range(1, 5):
+            setattr(self, f"key{index}", None)
         for widget in self.key_frame.winfo_children():
             widget.destroy()
 
@@ -3141,27 +3146,16 @@ class CryptoApp(ctk.CTk):
             self.status_bar.set_status("❌ " + translations["status_error"], "#ef4444")
 
     def _dispatch_crypto(self, text, method_suffix):
-        """يحوّل مدخلات الواجهة إلى استدعاء واحد للنواة."""
-        cipher = self.current_cipher
-        if cipher == "Caesar":
-            return getattr(CryptoCore, f"caesar_{method_suffix}")(text, int(self.key1.get()))
-        if cipher == "Affine":
-            return getattr(CryptoCore, f"affine_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()))
-        if cipher == "Vigenere":
-            return getattr(CryptoCore, f"vigenere_{method_suffix}")(text, self.key1.get())
-        if cipher == "Playfair":
-            return getattr(CryptoCore, f"playfair_{method_suffix}")(text, self.key1.get())
-        if cipher == "Hill":
-            return getattr(CryptoCore, f"hill_{method_suffix}")(text, self.key1.get())
-        if cipher == "DiffieHellman":
-            return getattr(CryptoCore, f"dh_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), int(self.key4.get()), self.lang)
-        if cipher == "RSA":
-            return getattr(CryptoCore, f"rsa_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), self.lang)
-        if cipher == "SDES":
-            return getattr(CryptoCore, f"sdes_{method_suffix}")(text.strip().replace(" ", ""), self.key1.get().strip())
-        if cipher == "DES":
-            return getattr(CryptoCore, f"des_{method_suffix}")(text.strip().replace(" ", ""), self.key1.get().strip())
-        raise ValueError(f"Cipher not implemented: {cipher}")
+        """يمرر قيم الواجهة إلى خدمة التشفير المستقلة."""
+        key_fields = [getattr(self, f"key{index}", None) for index in range(1, 5)]
+        keys = [field.get() if field is not None else "" for field in key_fields]
+        return CryptoOperationService.execute(
+            cipher=self.current_cipher,
+            text=text,
+            keys=keys,
+            operation=method_suffix,
+            lang=self.lang,
+        )
 
     def run_encrypt(self):
         self._run_crypto_operation("encrypt")
@@ -3236,13 +3230,13 @@ class CryptoApp(ctk.CTk):
         self.input_box.insert("1.0", data["text"])
         self.key1.delete(0, "end")
         self.key1.insert(0, data["key"])
-        if hasattr(self, 'key2') and "key2" in data:
+        if getattr(self, 'key2', None) is not None and "key2" in data:
             self.key2.delete(0, "end")
             self.key2.insert(0, data["key2"])
-        if hasattr(self, 'key3') and "key3" in data:
+        if getattr(self, 'key3', None) is not None and "key3" in data:
             self.key3.delete(0, "end")
             self.key3.insert(0, data["key3"])
-        if hasattr(self, 'key4') and "key4" in data:
+        if getattr(self, 'key4', None) is not None and "key4" in data:
             self.key4.delete(0, "end")
             self.key4.insert(0, data["key4"])
         self.update_char_count()
