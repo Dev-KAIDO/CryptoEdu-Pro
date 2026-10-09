@@ -53,6 +53,12 @@ class TestCryptoRoundTrips(unittest.TestCase):
         self.assertEqual(CryptoCore.des_encrypt(plaintext, key), ciphertext)
         self.assertEqual(CryptoCore.des_decrypt(ciphertext, key), plaintext)
 
+    def test_education_api_compatibility(self):
+        for cipher in ("Caesar", "Affine", "Vigenere", "Playfair", "Hill", "DiffieHellman", "RSA", "SDES", "DES"):
+            with self.subTest(cipher=cipher):
+                self.assertTrue(CryptoCore.get_full_code(cipher))
+                self.assertTrue(CryptoCore.get_explanation(cipher, "AR"))
+
 
 class TestCryptoValidation(unittest.TestCase):
     def test_empty_vigenere_key_is_rejected(self):
