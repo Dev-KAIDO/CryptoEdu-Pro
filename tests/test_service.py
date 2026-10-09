@@ -46,6 +46,16 @@ class TestCryptoOperationService(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Key m must be an integer"):
             CryptoOperationService.execute("Affine", "ABC", ["not-a-number", "10"], "encrypt")
 
+    def test_text_size_limits_are_enforced(self):
+        with self.assertRaisesRegex(ValueError, "maximum is 1000"):
+            CryptoOperationService.execute("RSA", "A" * 1001, ["61", "53", "17"], "encrypt")
+        with self.assertRaisesRegex(ValueError, "maximum is 100000"):
+            CryptoOperationService.execute("Caesar", "A" * 100001, ["3"], "encrypt")
+
+    def test_educational_prime_limit_is_enforced(self):
+        with self.assertRaisesRegex(ValueError, "too large"):
+            CryptoOperationService.execute("RSA", "A", ["1000003", "53", "17"], "encrypt")
+
 
 if __name__ == "__main__":
     unittest.main()

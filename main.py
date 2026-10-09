@@ -739,6 +739,17 @@ class CryptoApp(ctk.CTk):
         )
         self.cipher_desc_label.pack(anchor="w")
 
+        self.security_notice_label = ctk.CTkLabel(
+            title_text_frame,
+            text=self._L(
+                "⚠ تعليمي فقط — لا تستخدم هذه الخوارزميات لحماية بيانات حقيقية",
+                "⚠ Educational only — do not use these algorithms to protect real data"
+            ),
+            font=("Segoe UI", 10, "bold"),
+            text_color=T["WARNING_LIGHT"]
+        )
+        self.security_notice_label.pack(anchor="w", pady=(3, 0))
+
         self._input_card = ctk.CTkFrame(self.tab_crypto, fg_color=T["BG_CARD"], corner_radius=AppSizes.CARD_RADIUS, border_width=1, border_color=T["BORDER_COLOR"])
         self._input_card.pack(fill="both", expand=True, padx=25, pady=10)
 
@@ -1046,8 +1057,12 @@ class CryptoApp(ctk.CTk):
 
     def _schedule_analysis(self, text, result, operation):
         self._cancel_deferred_analysis()
+        # التحليل يبني عناصر Tkinter كثيرة؛ النتيجة الكاملة تبقى محفوظة،
+        # بينما نحلل جزءًا محدودًا فقط للحفاظ على سرعة الواجهة.
+        analysis_text = text[:100]
+        analysis_result = result[:100]
         self._analysis_defer_after = self.after(
-            30, lambda t=text, r=result, op=operation: self._update_analysis(t, r, op)
+            30, lambda t=analysis_text, r=analysis_result, op=operation: self._update_analysis(t, r, op)
         )
 
     def _update_analysis(self, input_text, output_text, operation):
@@ -3093,6 +3108,13 @@ class CryptoApp(ctk.CTk):
         if hasattr(self, 'cipher_desc_label'):
             desc_text = t[f"desc_{c.lower()}"]
             self.cipher_desc_label.configure(text=fix_bidi(desc_text) if self.lang == 'AR' else desc_text)
+        if hasattr(self, 'security_notice_label'):
+            self.security_notice_label.configure(
+                text=self._L(
+                    "⚠ تعليمي فقط — لا تستخدم هذه الخوارزميات لحماية بيانات حقيقية",
+                    "⚠ Educational only — do not use these algorithms to protect real data"
+                )
+            )
         if hasattr(self, 'encrypt_btn'):
             self.encrypt_btn.configure(text="\U0001f512 " + t["encrypt"])
         if hasattr(self, 'decrypt_btn'):
@@ -3247,7 +3269,8 @@ class CryptoApp(ctk.CTk):
     def _add_to_history(self, cipher, input_text, output_text, op_type):
         import datetime
         now = datetime.datetime.now().strftime("%H:%M")
-        item = {"cipher": cipher, "input": input_text[:20], "output": output_text[:20], "time": now, "type": op_type}
+        # السجل للبيانات الوصفية فقط؛ لا يحتفظ بالنصوص أو المفاتيح أو النتائج.
+        item = {"cipher": cipher, "time": now, "type": op_type}
         self.history_items.insert(0, item)
         if len(self.history_items) > 10:
             self.history_items.pop()

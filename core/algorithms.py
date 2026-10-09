@@ -5,6 +5,8 @@ import re
 class CryptoCore:
     """النواة الأساسية لخوارزميات التشفير"""
 
+    MAX_EDUCATIONAL_PRIME = 1_000_000
+
     @staticmethod
     def _require_latin_text(text, field="النص"):
         """ترفض الأحرف غير اللاتينية بدل تحويلها إلى نتائج خاطئة بصمت."""
@@ -285,6 +287,8 @@ class CryptoCore:
 
     @staticmethod
     def diffie_hellman_exchange(p, g, a, b, lang="AR"):
+        if p > CryptoCore.MAX_EDUCATIONAL_PRIME:
+            raise ValueError("قيمة p كبيرة جدًا للوضع التعليمي (الحد الأقصى 1000000)" if lang == "AR" else "p is too large for educational mode (maximum 1000000)")
         if not CryptoCore.is_prime(p):
             raise ValueError("العدد p يجب أن يكون أولياً" if lang == "AR" else "Number p must be prime")
         if not (1 < g < p):
@@ -333,6 +337,8 @@ class CryptoCore:
 
     @staticmethod
     def rsa_encrypt(text, p, q, e, lang="AR"):
+        if p > CryptoCore.MAX_EDUCATIONAL_PRIME or q > CryptoCore.MAX_EDUCATIONAL_PRIME:
+            raise ValueError("قيم p و q كبيرة جدًا للوضع التعليمي (الحد الأقصى 1000000)" if lang == "AR" else "p and q are too large for educational mode (maximum 1000000)")
         if not CryptoCore.is_prime(p) or not CryptoCore.is_prime(q):
             raise ValueError("يجب أن تكون الأعداد p و q أولية" if lang == "AR" else "Numbers p and q must be prime")
         if p == q:
@@ -357,6 +363,8 @@ class CryptoCore:
 
     @staticmethod
     def rsa_decrypt(text, p, q, e, lang="AR"):
+        if p > CryptoCore.MAX_EDUCATIONAL_PRIME or q > CryptoCore.MAX_EDUCATIONAL_PRIME:
+            raise ValueError("قيم p و q كبيرة جدًا للوضع التعليمي (الحد الأقصى 1000000)" if lang == "AR" else "p and q are too large for educational mode (maximum 1000000)")
         if not CryptoCore.is_prime(p) or not CryptoCore.is_prime(q):
             raise ValueError("الأعداد p و q يجب أن تكون أولية" if lang == "AR" else "Numbers p and q must be prime")
         if p == q:
