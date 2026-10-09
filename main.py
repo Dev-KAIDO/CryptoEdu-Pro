@@ -3109,136 +3109,65 @@ class CryptoApp(ctk.CTk):
             self.copy_code_btn.configure(text=self._L("\U0001f4cb \u0646\u0633\u062e \u0627\u0644\u0643\u0648\u062f", "\U0001f4cb Copy Code"))
         self.update_code_content()
 
-    def run_encrypt(self):
+    def _run_crypto_operation(self, operation):
+        """ينفذ عملية التشفير أو فك التشفير عبر مسار موحد."""
         text = self.input_box.get("1.0", "end-1c")
         if self.current_cipher != "DiffieHellman" and not text.strip():
-            self.status_bar.set_status("\u26a0\ufe0f " + ("\u0627\u0644\u0631\u062c\u0627\u0621 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0646\u0635!" if self.lang == "AR" else "Please enter text!"), "#f59e0b")
+            message = "الرجاء إدخال النص!" if self.lang == "AR" else "Please enter text!"
+            self.status_bar.set_status("⚠️ " + message, "#f59e0b")
             return
 
-        try:
-            t = TRANSLATIONS[self.lang]
-            self.status_bar.set_status(t["status_encrypting"], "#f59e0b")
-            self.update()
+        translations = TRANSLATIONS[self.lang]
+        status_key = "status_encrypting" if operation == "encrypt" else "status_decrypting"
+        method_suffix = "encrypt" if operation == "encrypt" else "decrypt"
 
-            if self.current_cipher == "Caesar":
-                key = int(self.key1.get())
-                result = CryptoCore.caesar_encrypt(text, key)
-            elif self.current_cipher == "Affine":
-                m = int(self.key1.get())
-                k = int(self.key2.get())
-                result = CryptoCore.affine_encrypt(text, m, k)
-            elif self.current_cipher == "Vigenere":
-                key = self.key1.get()
-                result = CryptoCore.vigenere_encrypt(text, key)
-            elif self.current_cipher == "Playfair":
-                key = self.key1.get()
-                result = CryptoCore.playfair_encrypt(text, key)
-            elif self.current_cipher == "Hill":
-                key = self.key1.get()
-                result = CryptoCore.hill_encrypt(text, key)
-            elif self.current_cipher == "DiffieHellman":
-                p = int(self.key1.get())
-                g = int(self.key2.get())
-                a = int(self.key3.get())
-                b = int(self.key4.get())
-                result = CryptoCore.dh_encrypt(text, p, g, a, b, self.lang)
-            elif self.current_cipher == "RSA":
-                p = int(self.key1.get())
-                q = int(self.key2.get())
-                e = int(self.key3.get())
-                result = CryptoCore.rsa_encrypt(text, p, q, e, self.lang)
-            elif self.current_cipher == "SDES":
-                key = self.key1.get().strip()
-                pt = text.strip().replace(' ', '')
-                result = CryptoCore.sdes_encrypt(pt, key)
-            elif self.current_cipher == "DES":
-                key = self.key1.get().strip()
-                pt = text.strip().replace(' ', '')
-                result = CryptoCore.des_encrypt(pt, key)
-            else:
-                raise ValueError(f"Cipher not implemented: {self.current_cipher}")
+        try:
+            self.status_bar.set_status(translations[status_key], "#f59e0b")
+            self.update()
+            result = self._dispatch_crypto(text, method_suffix)
 
             self.output_box.delete("1.0", "end")
             self.output_box.insert("1.0", result)
-            self.status_bar.set_status("\u2705 " + t["status_ready"], "#10b981")
+            self.status_bar.set_status("✅ " + translations["status_ready"], "#10b981")
 
             self.operations_count += 1
-            if hasattr(self, 'ops_label'):
-                ops_text = "\u0639\u0645\u0644\u064a\u0627\u062a" if self.lang == "AR" else "operations"
-                self.ops_label.configure(text=f"{self.operations_count} {ops_text}")
-            self._add_to_history(self.current_cipher, text, result, "encrypt")
-            # defer heavy analysis build to keep UI responsive — نختزنه حتى نلغي أي نسخة قديمة عند تغيير التشفير
-            self._schedule_analysis(text, result, "encrypt")
-
-        except Exception as e:
+            if hasattr(self, "ops_label"):
+                self.ops_label.configure(text=f"{self.operations_count} {translations['operations']}")
+            self._add_to_history(self.current_cipher, text, result, operation)
+            self._schedule_analysis(text, result, operation)
+        except Exception as error:
             self.output_box.delete("1.0", "end")
-            self.output_box.insert("1.0", f"\u274c {fix_bidi(str(e))}")
-            self.status_bar.set_status("\u274c " + TRANSLATIONS[self.lang]["status_error"], "#ef4444")
+            self.output_box.insert("1.0", f"❌ {fix_bidi(str(error))}")
+            self.status_bar.set_status("❌ " + translations["status_error"], "#ef4444")
+
+    def _dispatch_crypto(self, text, method_suffix):
+        """يحوّل مدخلات الواجهة إلى استدعاء واحد للنواة."""
+        cipher = self.current_cipher
+        if cipher == "Caesar":
+            return getattr(CryptoCore, f"caesar_{method_suffix}")(text, int(self.key1.get()))
+        if cipher == "Affine":
+            return getattr(CryptoCore, f"affine_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()))
+        if cipher == "Vigenere":
+            return getattr(CryptoCore, f"vigenere_{method_suffix}")(text, self.key1.get())
+        if cipher == "Playfair":
+            return getattr(CryptoCore, f"playfair_{method_suffix}")(text, self.key1.get())
+        if cipher == "Hill":
+            return getattr(CryptoCore, f"hill_{method_suffix}")(text, self.key1.get())
+        if cipher == "DiffieHellman":
+            return getattr(CryptoCore, f"dh_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), int(self.key4.get()), self.lang)
+        if cipher == "RSA":
+            return getattr(CryptoCore, f"rsa_{method_suffix}")(text, int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), self.lang)
+        if cipher == "SDES":
+            return getattr(CryptoCore, f"sdes_{method_suffix}")(text.strip().replace(" ", ""), self.key1.get().strip())
+        if cipher == "DES":
+            return getattr(CryptoCore, f"des_{method_suffix}")(text.strip().replace(" ", ""), self.key1.get().strip())
+        raise ValueError(f"Cipher not implemented: {cipher}")
+
+    def run_encrypt(self):
+        self._run_crypto_operation("encrypt")
 
     def run_decrypt(self):
-        text = self.input_box.get("1.0", "end-1c")
-        if self.current_cipher != "DiffieHellman" and not text.strip():
-            self.status_bar.set_status("\u26a0\ufe0f " + ("\u0627\u0644\u0631\u062c\u0627\u0621 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0646\u0635!" if self.lang == "AR" else "Please enter text!"), "#f59e0b")
-            return
-
-        try:
-            t = TRANSLATIONS[self.lang]
-            self.status_bar.set_status(t["status_decrypting"], "#f59e0b")
-            self.update()
-
-            if self.current_cipher == "Caesar":
-                key = int(self.key1.get())
-                result = CryptoCore.caesar_decrypt(text, key)
-            elif self.current_cipher == "Affine":
-                m = int(self.key1.get())
-                k = int(self.key2.get())
-                result = CryptoCore.affine_decrypt(text, m, k)
-            elif self.current_cipher == "Vigenere":
-                key = self.key1.get()
-                result = CryptoCore.vigenere_decrypt(text, key)
-            elif self.current_cipher == "Playfair":
-                key = self.key1.get()
-                result = CryptoCore.playfair_decrypt(text, key)
-            elif self.current_cipher == "Hill":
-                key = self.key1.get()
-                result = CryptoCore.hill_decrypt(text, key)
-            elif self.current_cipher == "DiffieHellman":
-                p = int(self.key1.get())
-                g = int(self.key2.get())
-                a = int(self.key3.get())
-                b = int(self.key4.get())
-                result = CryptoCore.dh_decrypt(text, p, g, a, b, self.lang)
-            elif self.current_cipher == "RSA":
-                p = int(self.key1.get())
-                q = int(self.key2.get())
-                e = int(self.key3.get())
-                result = CryptoCore.rsa_decrypt(text, p, q, e, self.lang)
-            elif self.current_cipher == "SDES":
-                key = self.key1.get().strip()
-                ct = text.strip().replace(' ', '')
-                result = CryptoCore.sdes_decrypt(ct, key)
-            elif self.current_cipher == "DES":
-                key = self.key1.get().strip()
-                ct = text.strip().replace(' ', '')
-                result = CryptoCore.des_decrypt(ct, key)
-            else:
-                raise ValueError(f"Cipher not implemented: {self.current_cipher}")
-
-            self.output_box.delete("1.0", "end")
-            self.output_box.insert("1.0", result)
-            self.status_bar.set_status("\u2705 " + t["status_ready"], "#10b981")
-
-            self.operations_count += 1
-            if hasattr(self, 'ops_label'):
-                ops_text = "\u0639\u0645\u0644\u064a\u0627\u062a" if self.lang == "AR" else "operations"
-                self.ops_label.configure(text=f"{self.operations_count} {ops_text}")
-            self._add_to_history(self.current_cipher, text, result, "decrypt")
-            self._schedule_analysis(text, result, "decrypt")
-
-        except Exception as e:
-            self.output_box.delete("1.0", "end")
-            self.output_box.insert("1.0", f"\u274c {fix_bidi(str(e))}")
-            self.status_bar.set_status("\u274c " + TRANSLATIONS[self.lang]["status_error"], "#ef4444")
+        self._run_crypto_operation("decrypt")
 
     def copy_result(self):
         result = self.output_box.get("1.0", "end-1c")
