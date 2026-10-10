@@ -1,6 +1,7 @@
 # core/algorithms.py
 import math
 import re
+from functools import lru_cache
 
 class CryptoCore:
     """النواة الأساسية لخوارزميات التشفير"""
@@ -296,15 +297,20 @@ class CryptoCore:
         if not (0 < a < p and 0 < b < p):
             raise ValueError("المفاتيح الخاصة يجب أن تكون موجبة وأصغر من p" if lang == "AR" else "Private keys must be positive and less than p")
 
-        A = pow(g, a, p)
-        B = pow(g, b, p)
-        ka = pow(B, a, p)
-        kb = pow(A, b, p)
+        ka = CryptoCore._dh_shared_secret(p, g, a, b)
+        kb = CryptoCore._dh_shared_secret(p, g, b, a)
 
         if ka != kb:
             raise ValueError("خطأ في الحساب! المفاتيح غير متطابقة" if lang == "AR" else "Calculation error! Keys do not match")
 
         return str(ka)
+
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def _dh_shared_secret(p, g, private_key, peer_private_key):
+        """يحفظ حساب DH المتكرر للمعلمات التعليمية نفسها فقط."""
+        peer_public = pow(g, peer_private_key, p)
+        return pow(peer_public, private_key, p)
 
     @staticmethod
     def dh_encrypt(text, p, g, a, b, lang="AR"):
@@ -643,6 +649,7 @@ class CryptoCore:
         return CryptoCore._des_permute(substituted, CryptoCore.DES_P)
 
     @staticmethod
+    @lru_cache(maxsize=128)
     def des_keygen(key):
         key = key.replace(' ', '')
         if len(key) != 64 or not all(c in '01' for c in key):
@@ -655,7 +662,7 @@ class CryptoCore:
             C = CryptoCore._des_left_shift(C, n)
             D = CryptoCore._des_left_shift(D, n)
             keys.append(CryptoCore._des_permute(C + D, CryptoCore.DES_PC2))
-        return keys
+        return tuple(keys)
 
     @staticmethod
     def _des_core(block64, key64, decrypt=False):

@@ -6,6 +6,8 @@ import re
 import math
 import bisect
 import pyperclip
+import queue
+from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -267,6 +269,11 @@ class CryptoApp(ctk.CTk):
         self._code_cache = {}
         self._analysis_build_after = None
         self._analysis_defer_after = None
+        self._crypto_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="crypto")
+        self._crypto_job_id = 0
+        self._crypto_busy = False
+        self._closing = False
+        self._crypto_results = queue.Queue()
         self.setup_sidebar()
         self.setup_main_content()
         self.setup_crypto_tab()
@@ -275,6 +282,7 @@ class CryptoApp(ctk.CTk):
         self._build_analysis_page()
         self._crypto_built = True
         self._code_built = True
+        self.after(50, self._poll_crypto_results)
 
     def _apply_theme(self, theme_name=None):
         if theme_name:
@@ -3046,6 +3054,10 @@ class CryptoApp(ctk.CTk):
         self.status_bar.set_status(TRANSLATIONS[self.lang]["status_ready"])
 
     def change_cipher(self, new_cipher):
+        if getattr(self, "_crypto_busy", False):
+            self._crypto_job_id += 1
+            self._crypto_busy = False
+            self._set_crypto_controls_enabled(True)
         self.current_cipher = new_cipher
         self._analysis_ready = False
         # ألغِ أي بناء تحليل مؤجل أو تجزئة عجلات قديمة حتى لا تُبني نتيجة خاطئة أو تختفي الواجهات
@@ -3148,24 +3160,72 @@ class CryptoApp(ctk.CTk):
         status_key = "status_encrypting" if operation == "encrypt" else "status_decrypting"
         method_suffix = "encrypt" if operation == "encrypt" else "decrypt"
 
-        try:
-            self.status_bar.set_status(translations[status_key], "#f59e0b")
-            self.update()
-            result = self._dispatch_crypto(text, method_suffix)
+        if self._crypto_busy:
+            return
 
+        key_fields = [getattr(self, f"key{index}", None) for index in range(1, 5)]
+        keys = tuple(field.get() if field is not None else "" for field in key_fields)
+        cipher = self.current_cipher
+        lang = self.lang
+        self._crypto_busy = True
+        self._crypto_job_id += 1
+        job_id = self._crypto_job_id
+        self._set_crypto_controls_enabled(False)
+        self.status_bar.set_status(translations[status_key], "#f59e0b")
+
+        future = self._crypto_executor.submit(
+            CryptoOperationService.execute,
+            cipher,
+            text,
+            keys,
+            method_suffix,
+            lang,
+        )
+        future.add_done_callback(
+            lambda completed: self._crypto_results.put((job_id, cipher, text, operation, completed))
+            if not self._closing else None
+        )
+
+    def _poll_crypto_results(self):
+        """يفرغ نتائج العمال داخل خيط Tkinter الرئيسي فقط."""
+        if self._closing:
+            return
+        try:
+            while True:
+                item = self._crypto_results.get_nowait()
+                self._finish_crypto_operation(*item)
+        except queue.Empty:
+            pass
+        self.after(50, self._poll_crypto_results)
+
+    def _finish_crypto_operation(self, job_id, cipher, text, operation, future):
+        """يعيد نتيجة Worker إلى Tkinter فقط إذا كانت ما زالت أحدث عملية."""
+        if self._closing or job_id != self._crypto_job_id:
+            return
+        translations = TRANSLATIONS[self.lang]
+        self._crypto_busy = False
+        self._set_crypto_controls_enabled(True)
+        try:
+            result = future.result()
             self.output_box.delete("1.0", "end")
             self.output_box.insert("1.0", result)
             self.status_bar.set_status("✅ " + translations["status_ready"], "#10b981")
-
             self.operations_count += 1
             if hasattr(self, "ops_label"):
                 self.ops_label.configure(text=f"{self.operations_count} {translations['operations']}")
-            self._add_to_history(self.current_cipher, text, result, operation)
+            self._add_to_history(cipher, text, result, operation)
             self._schedule_analysis(text, result, operation)
         except Exception as error:
             self.output_box.delete("1.0", "end")
             self.output_box.insert("1.0", f"❌ {fix_bidi(str(error))}")
             self.status_bar.set_status("❌ " + translations["status_error"], "#ef4444")
+
+    def _set_crypto_controls_enabled(self, enabled):
+        state = "normal" if enabled else "disabled"
+        for button_name in ("encrypt_btn", "decrypt_btn"):
+            button = getattr(self, button_name, None)
+            if button is not None:
+                button.configure(state=state)
 
     def _dispatch_crypto(self, text, method_suffix):
         """يمرر قيم الواجهة إلى خدمة التشفير المستقلة."""
@@ -3232,6 +3292,9 @@ class CryptoApp(ctk.CTk):
         return self.update_char_count(event)
 
     def on_closing(self):
+        self._closing = True
+        self._crypto_job_id += 1
+        self._crypto_executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
 
     # ─── الاختبار السريع ───
@@ -3263,7 +3326,6 @@ class CryptoApp(ctk.CTk):
             self.key4.insert(0, data["key4"])
         self.update_char_count()
         self.run_encrypt()
-        self._add_to_history(self.current_cipher, data["text"], self.output_box.get("1.0", "end-1c"), "test")
 
     # ─── سجل العمليات ───
     def _add_to_history(self, cipher, input_text, output_text, op_type):

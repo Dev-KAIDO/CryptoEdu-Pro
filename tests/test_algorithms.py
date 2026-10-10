@@ -36,6 +36,14 @@ class TestCryptoRoundTrips(unittest.TestCase):
         encrypted = CryptoCore.dh_encrypt("HELLO", 23, 5, 6, 15)
         self.assertEqual(CryptoCore.dh_decrypt(encrypted, 23, 5, 6, 15), "HELLO")
 
+    def test_dh_cache_reuses_shared_secret(self):
+        CryptoCore._dh_shared_secret.cache_clear()
+        CryptoCore.diffie_hellman_exchange(23, 5, 6, 15)
+        before = CryptoCore._dh_shared_secret.cache_info()
+        CryptoCore.diffie_hellman_exchange(23, 5, 6, 15)
+        after = CryptoCore._dh_shared_secret.cache_info()
+        self.assertEqual(after.hits, before.hits + 2)
+
     def test_rsa(self):
         encrypted = CryptoCore.rsa_encrypt("HI", 61, 53, 17)
         self.assertEqual(encrypted, "3000,1486")
@@ -52,6 +60,15 @@ class TestCryptoRoundTrips(unittest.TestCase):
         ciphertext = "1000010111101000000100110101010000001111000010101011010000000101"
         self.assertEqual(CryptoCore.des_encrypt(plaintext, key), ciphertext)
         self.assertEqual(CryptoCore.des_decrypt(ciphertext, key), plaintext)
+
+    def test_des_key_cache_reuses_round_keys(self):
+        key = "0001001100110100010101110111100110011011101111001101111111110001"
+        CryptoCore.des_keygen.cache_clear()
+        CryptoCore.des_encrypt("0000000100100011010001010110011110001001101010111100110111101111", key)
+        before = CryptoCore.des_keygen.cache_info()
+        CryptoCore.des_encrypt("0000000100100011010001010110011110001001101010111100110111101111", key)
+        after = CryptoCore.des_keygen.cache_info()
+        self.assertEqual(after.hits, before.hits + 1)
 
     def test_education_api_compatibility(self):
         for cipher in ("Caesar", "Affine", "Vigenere", "Playfair", "Hill", "DiffieHellman", "RSA", "SDES", "DES"):
