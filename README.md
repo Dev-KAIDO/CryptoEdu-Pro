@@ -217,7 +217,8 @@ CryptoEdu-Pro/
 │   ├── translations.py     # النصوص العربية والإنجليزية
 │   ├── widgets.py          # مكونات واجهة قابلة لإعادة الاستخدام
 │   ├── analysis_view.py    # صفحة التحليل الرسومي وشرح خطوات الخوارزميات
-│   └── key_fields.py       # إنشاء وقراءة حقول مفاتيح الخوارزميات
+│   ├── key_fields.py       # إنشاء وقراءة حقول مفاتيح الخوارزميات
+│   └── code_view.py        # تبويب الكود الكامل والشرح والتلوين
 ├── tests/
 │   └── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
 │   └── test_service.py      # اختبارات طبقة تنفيذ العمليات
@@ -307,6 +308,7 @@ pyinstaller CryptoEdu.spec
 - [x] إضافة Cache محدود لمفاتيح جولات DES ونتيجة DH التعليمية المتكررة.
 - [x] فصل صفحة التحليل الرسومي ومساعداتها في `ui/analysis_view.py` عبر `AnalysisViewMixin`.
 - [x] فصل إنشاء وقراءة حقول المفاتيح في `ui/key_fields.py` عبر `KeyFieldsMixin`.
+- [x] فصل تبويب شرح الكود وتلوينه في `ui/code_view.py` عبر `CodeViewMixin`.
 
 ---
 
