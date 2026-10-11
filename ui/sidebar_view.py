@@ -1,0 +1,203 @@
+"""Sidebar construction for CryptoEdu Pro."""
+
+import customtkinter as ctk
+
+from ui.styles import AppSizes
+from ui.translations import TRANSLATIONS
+
+
+class SidebarViewMixin:
+    def setup_sidebar(self):
+        T = self._T
+        self.sidebar = ctk.CTkFrame(
+            self,
+            width=AppSizes.SIDEBAR_WIDTH,
+            corner_radius=0,
+            fg_color=T["BG_SIDEBAR"]
+        )
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_propagate(False)
+        self.sidebar.configure(width=AppSizes.SIDEBAR_WIDTH)
+
+        logo_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        logo_frame.pack(pady=(25, 5))
+
+        self.icon_bg = ctk.CTkFrame(logo_frame, fg_color=T["PRIMARY"], corner_radius=20, width=60, height=60)
+        self.icon_bg.pack(pady=(0, 10))
+        self.icon_bg.pack_propagate(False)
+        ctk.CTkLabel(self.icon_bg, text="\U0001f510", font=("Segoe UI", 28)).pack(expand=True)
+
+        self.logo = ctk.CTkLabel(
+            logo_frame,
+            text="CryptoEdu",
+            font=("Segoe UI", 24, "bold"),
+            text_color=T["TEXT_WHITE"]
+        )
+        self.logo.pack()
+
+        self.author_card = ctk.CTkFrame(
+            self.sidebar,
+            fg_color=T["BG_CARD"],
+            corner_radius=10,
+            border_width=1,
+            border_color=T["BORDER_COLOR"]
+        )
+        self.author_card.pack(pady=(8, 20), padx=20, fill="x")
+        self.author = ctk.CTkLabel(
+            self.author_card,
+            text=TRANSLATIONS[self.lang]["author"],
+            font=("Segoe UI", 16, "bold"),
+            text_color=T["PRIMARY_LIGHT"]
+        )
+        self.author.pack(padx=12, pady=10)
+
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=T["BORDER_COLOR"]).pack(fill="x", padx=20, pady=10)
+
+        lang_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        lang_section.pack(pady=10, padx=20, fill="x")
+
+        ctk.CTkLabel(
+            lang_section,
+            text="\U0001f310 " + TRANSLATIONS[self.lang]["language"],
+            font=("Segoe UI", 11),
+            text_color=T["TEXT_GRAY"]
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.lang_btn = ctk.CTkSegmentedButton(
+            lang_section,
+            values=["AR", "EN"],
+            command=self.change_language,
+            font=("Segoe UI", 14, "bold"),
+            selected_color=T["PRIMARY"],
+            selected_hover_color=T["PRIMARY_LIGHT"],
+            unselected_color=T["BG_CARD"],
+            unselected_hover_color=T["BG_CARD_HOVER"],
+            height=40
+        )
+        self.lang_btn.set(self.lang)
+        self.lang_btn.pack(fill="x")
+
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=T["BORDER_COLOR"]).pack(fill="x", padx=20, pady=10)
+
+        theme_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        theme_section.pack(pady=5, padx=20, fill="x")
+
+        ctk.CTkLabel(
+            theme_section,
+            text="\U0001f3a8 Theme",
+            font=("Segoe UI", 11),
+            text_color=T["TEXT_GRAY"]
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.theme_menu = ctk.CTkOptionMenu(
+            theme_section,
+            values=list(self.THEME_NAMES),
+            command=self.change_theme,
+            font=("Segoe UI", 14, "bold"),
+            fg_color=T["PRIMARY"],
+            button_color=T["PRIMARY_DARK"],
+            button_hover_color=T["PRIMARY_LIGHT"],
+            dropdown_fg_color=T["BG_CARD"],
+            dropdown_hover_color=T["BG_CARD_HOVER"],
+            height=40
+        )
+        self.theme_menu.set(self.current_theme_name)
+        self.theme_menu.pack(fill="x")
+
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=T["BORDER_COLOR"]).pack(fill="x", padx=20, pady=10)
+
+        cipher_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        cipher_section.pack(pady=5, padx=20, fill="x")
+
+        ctk.CTkLabel(
+            cipher_section,
+            text="\u2699\ufe0f " + TRANSLATIONS[self.lang]["select_cipher"],
+            font=("Segoe UI", 11),
+            text_color=T["TEXT_GRAY"]
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.cipher_menu = ctk.CTkOptionMenu(
+            cipher_section,
+            values=["Caesar", "Affine", "Vigenere", "Playfair", "Hill", "DiffieHellman", "RSA", "SDES", "DES"],
+            command=self.change_cipher,
+            font=("Segoe UI", 14, "bold"),
+            fg_color=T["PRIMARY"],
+            button_color=T["PRIMARY_DARK"],
+            button_hover_color=T["PRIMARY_LIGHT"],
+            dropdown_fg_color=T["BG_CARD"],
+            dropdown_hover_color=T["BG_CARD_HOVER"],
+            height=40
+        )
+        self.cipher_menu.set(self.current_cipher)
+        self.cipher_menu.pack(fill="x")
+
+        self.cipher_info_card = ctk.CTkFrame(
+            self.sidebar,
+            fg_color=T["BG_CARD"],
+            corner_radius=AppSizes.CARD_RADIUS,
+            border_width=1,
+            border_color=T["BORDER_COLOR"]
+        )
+        self.cipher_info_card.pack(pady=15, padx=20, fill="x")
+
+        self.cipher_info_label = ctk.CTkLabel(
+            self.cipher_info_card,
+            text=TRANSLATIONS[self.lang][f"desc_{self.current_cipher.lower()}"],
+            font=("Segoe UI", 11),
+            text_color=T["TEXT_LIGHT"],
+            wraplength=220,
+            justify="right" if self.lang == "AR" else "left"
+        )
+        self.cipher_info_label.pack(padx=15, pady=15)
+
+        stats_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        stats_frame.pack(pady=10, padx=20, fill="x")
+
+        self.operations_card = ctk.CTkFrame(stats_frame, fg_color=T["BG_CARD"], corner_radius=8)
+        self.operations_card.pack(fill="x", pady=5)
+
+        ctk.CTkLabel(self.operations_card, text="\U0001f4ca", font=("Segoe UI", 14)).pack(side="left", padx=10, pady=8)
+        ops_text = "عمليات" if self.lang == "AR" else "operations"
+        self.ops_label = ctk.CTkLabel(self.operations_card, text=f"0 {ops_text}", font=("Segoe UI", 11), text_color=T["TEXT_GRAY"])
+        self.ops_label.pack(side="left", pady=8)
+
+        # === زر الاختبار السريع ===
+        test_btn = ctk.CTkButton(
+            stats_frame,
+            text="\U0001f9ea " + ("اختبار سريع" if self.lang == "AR" else "Quick Test"),
+            command=self._quick_test,
+            font=("Segoe UI", 12, "bold"),
+            fg_color=T["PRIMARY"],
+            hover_color=T["PRIMARY_LIGHT"],
+            corner_radius=8,
+            height=35
+        )
+        test_btn.pack(fill="x", pady=5)
+
+        # === سجل العمليات ===
+        self.history_frame = ctk.CTkFrame(stats_frame, fg_color=T["BG_CARD"], corner_radius=8)
+        self.history_frame.pack(fill="x", pady=5)
+
+        history_header = ctk.CTkFrame(self.history_frame, fg_color="transparent")
+        history_header.pack(fill="x", padx=10, pady=(8, 2))
+        ctk.CTkLabel(history_header, text="\U0001f4cb " + ("السجل" if self.lang == "AR" else "History"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_LIGHT"]).pack(side="left")
+        self.history_clear_btn = ctk.CTkButton(history_header, text="\U0001f5d1\ufe0f", width=25, height=25, font=("Segoe UI", 10), fg_color="transparent", hover_color=T["ERROR"], command=self._clear_history)
+        self.history_clear_btn.pack(side="right")
+
+        self.history_list_frame = ctk.CTkScrollableFrame(self.history_frame, fg_color=T["BG_INPUT"], corner_radius=6, height=120)
+        self.history_list_frame.pack(fill="x", padx=8, pady=(0, 8))
+
+        self.history_items = []
+
+        # === زر المساعدة ===
+        help_btn = ctk.CTkButton(
+            stats_frame,
+            text="\u2753 " + ("مساعدة" if self.lang == "AR" else "Help"),
+            command=self._show_help,
+            font=("Segoe UI", 12, "bold"),
+            fg_color=T["ACCENT"],
+            hover_color=T["WARNING_LIGHT"],
+            corner_radius=8,
+            height=35
+        )
+        help_btn.pack(fill="x", pady=5)

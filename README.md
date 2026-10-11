@@ -219,7 +219,8 @@ CryptoEdu-Pro/
 │   ├── analysis_view.py    # صفحة التحليل الرسومي وشرح خطوات الخوارزميات
 │   ├── key_fields.py       # إنشاء وقراءة حقول مفاتيح الخوارزميات
 │   ├── code_view.py        # تبويب الكود الكامل والشرح والتلوين
-│   └── crypto_view.py      # تبويب التشفير وبطاقات الإدخال والنتائج
+│   ├── crypto_view.py      # تبويب التشفير وبطاقات الإدخال والنتائج
+│   └── sidebar_view.py     # الشريط الجانبي والإعدادات والسجل
 ├── tests/
 │   └── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
 │   └── test_service.py      # اختبارات طبقة تنفيذ العمليات
@@ -233,7 +234,7 @@ CryptoEdu-Pro/
 
 ```mermaid
 flowchart LR
-    A[واجهة CryptoEdu Pro] --> B[إدارة اللغة والثيم]
+    A[واجهة CryptoEdu Pro] --> B[SidebarViewMixin\nاللغة والثيم والسجل]
     A --> C[CryptoViewMixin\nتبويب التشفير العملي]
     A --> D[تبويب شرح الكود والتحليل]
     C --> E[CryptoOperationService]
@@ -311,6 +312,7 @@ pyinstaller CryptoEdu.spec
 - [x] فصل إنشاء وقراءة حقول المفاتيح في `ui/key_fields.py` عبر `KeyFieldsMixin`.
 - [x] فصل تبويب شرح الكود وتلوينه في `ui/code_view.py` عبر `CodeViewMixin`.
 - [x] فصل بناء تبويب التشفير في `ui/crypto_view.py` عبر `CryptoViewMixin`.
+- [x] فصل بناء الشريط الجانبي في `ui/sidebar_view.py` عبر `SidebarViewMixin`.
 
 ---
 
