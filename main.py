@@ -2,9 +2,6 @@
 import customtkinter as ctk
 import sys
 import os
-import re
-import math
-import bisect
 import pyperclip
 import queue
 from concurrent.futures import ThreadPoolExecutor
@@ -22,121 +19,8 @@ from ui.sidebar_view import SidebarViewMixin
 from core.textutils import fix_bidi
 from ui.translations import TRANSLATIONS
 
-try:
-    from ui.styles import AppColors, AppFonts, AppSizes
-except ImportError:
-    class AppColors:
-        PRIMARY = "#7c3aed"
-        PRIMARY_LIGHT = "#a78bfa"
-        PRIMARY_DARK = "#5b21b6"
-        PRIMARY_DARKER = "#312e81"
-        SECONDARY = "#06b6d4"
-        SECONDARY_LIGHT = "#22d3ee"
-        ACCENT = "#f59e0b"
-        ACCENT_LIGHT = "#fbbf24"
-        PURPLE = "#a855f7"
-        PINK = "#ec4899"
-        BG_DARK = "#0a0a0f"
-        BG_CARD = "#12121a"
-        BG_CARD_HOVER = "#1e1e2e"
-        BG_INPUT = "#1a1a25"
-        BG_SIDEBAR = "#08080d"
-        TEXT_WHITE = "#ffffff"
-        TEXT_LIGHT = "#e2e8f0"
-        TEXT_GRAY = "#94a3b8"
-        TEXT_MUTED = "#64748b"
-        SUCCESS = "#10b981"
-        SUCCESS_LIGHT = "#34d399"
-        ERROR = "#ef4444"
-        ERROR_LIGHT = "#f87171"
-        WARNING = "#f59e0b"
-        WARNING_LIGHT = "#fbbf24"
-        INFO = "#3b82f6"
-        ENCRYPT_COLOR = "#10b981"
-        DECRYPT_COLOR = "#f59e0b"
-        COPY_COLOR = "#6366f1"
-        CLEAR_COLOR = "#ef4444"
-        CODE_KEYWORD = "#c084fc"
-        CODE_FUNCTION = "#22d3ee"
-        CODE_STRING = "#34d399"
-        CODE_COMMENT = "#64748b"
-        CODE_NUMBER = "#fbbf24"
-        CODE_OPERATOR = "#f472b6"
-        BORDER_COLOR = "#2a2a35"
-        BORDER_FOCUS = "#6366f1"
-
-    class AppFonts:
-        TITLE = ("Segoe UI", 28, "bold")
-        SUBTITLE = ("Segoe UI", 16, "normal")
-        BODY = ("Segoe UI", 13, "normal")
-        BUTTON = ("Segoe UI", 14, "bold")
-        BUTTON_LARGE = ("Segoe UI", 16, "bold")
-        CODE = ("Cascadia Code", 12, "normal")
-        CODE_BOLD = ("Cascadia Code", 12, "bold")
-        CODE_LARGE = ("Cascadia Code", 14, "normal")
-        SMALL = ("Segoe UI", 11, "normal")
-        STAT_NUMBER = ("Segoe UI", 24, "bold")
-        HERO_TITLE = ("Segoe UI", 36, "bold")
-
-    class AppSizes:
-        SIDEBAR_WIDTH = 280
-        BUTTON_HEIGHT = 45
-        BUTTON_HEIGHT_SMALL = 35
-        INPUT_HEIGHT = 150
-        CARD_RADIUS = 12
-        BUTTON_RADIUS = 10
-
-try:
-    from ui.widgets import StatusBar, AnimatedButton, ExplanationCard, CodeBlock
-except ImportError:
-    class StatusBar(ctk.CTkFrame):
-        def __init__(self, master, **kwargs):
-            super().__init__(master, height=40, **kwargs)
-            self.configure(fg_color="#12121a", corner_radius=0)
-            self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
-            self.status_frame.pack(side="left", padx=15, pady=8)
-            self.status_dot = ctk.CTkLabel(self.status_frame, text="\u25cf", font=("Segoe UI", 10), text_color="#10b981")
-            self.status_dot.pack(side="left", padx=(0, 5))
-            self.status_label = ctk.CTkLabel(self.status_frame, text="\u062c\u0627\u0647\u0638", font=("Segoe UI", 11), text_color="#e2e8f0")
-            self.status_label.pack(side="left")
-            self.count_frame = ctk.CTkFrame(self, fg_color="transparent")
-            self.count_frame.pack(side="right", padx=15, pady=8)
-            self.char_label = ctk.CTkLabel(self.count_frame, text="\U0001f4dd 0", font=("Segoe UI", 11), text_color="#94a3b8")
-            self.char_label.pack(side="right", padx=10)
-            self.word_label = ctk.CTkLabel(self.count_frame, text="\U0001f4c4 0", font=("Segoe UI", 11), text_color="#94a3b8")
-            self.word_label.pack(side="right", padx=10)
-
-        def set_status(self, text, color="#10b981"):
-            self.status_label.configure(text=text, text_color="#e2e8f0")
-            self.status_dot.configure(text_color=color)
-
-        def set_count(self, count, word_count=0):
-            self.char_label.configure(text=f"\U0001f4dd {count}")
-            self.word_label.configure(text=f"\U0001f4c4 {word_count}")
-
-    class AnimatedButton(ctk.CTkButton):
-        def __init__(self, master, color=None, **kwargs):
-            super().__init__(master, **kwargs)
-            self.configure(corner_radius=10, border_width=0, font=("Segoe UI", 14, "bold"), height=45)
-
-    class ExplanationCard(ctk.CTkFrame):
-        def __init__(self, master, code_line, explanation, index=0, **kwargs):
-            super().__init__(master, fg_color="#12121a", corner_radius=10, border_width=1, border_color="#2a2a35", **kwargs)
-            content = ctk.CTkFrame(self, fg_color="transparent")
-            content.pack(fill="x", padx=15, pady=10)
-            if code_line.strip():
-                ctk.CTkLabel(content, text=code_line, font=("Cascadia Code", 12), text_color="#ffffff", anchor="w", wraplength=400).pack(fill="x", pady=(0, 5))
-            if explanation.strip():
-                ctk.CTkLabel(content, text=explanation, font=("Segoe UI", 13), text_color="#e2e8f0", anchor="w", wraplength=400).pack(fill="x")
-
-    class CodeBlock(ctk.CTkFrame):
-        def __init__(self, master, code_text, **kwargs):
-            super().__init__(master, fg_color="#1a1a25", corner_radius=10, **kwargs)
-            self.code_text = ctk.CTkTextbox(self, font=("Cascadia Code", 12), fg_color="transparent", text_color="#ffffff", wrap="word")
-            self.code_text.pack(fill="both", expand=True, padx=10, pady=10)
-            self.code_text.insert("1.0", code_text)
-            self.code_text.configure(state="disabled")
-
+from ui.styles import AppSizes
+from ui.widgets import StatusBar
 
 THEMES = {
     "Midnight": {

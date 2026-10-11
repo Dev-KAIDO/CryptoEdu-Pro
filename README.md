@@ -222,8 +222,10 @@ CryptoEdu-Pro/
 │   ├── crypto_view.py      # تبويب التشفير وبطاقات الإدخال والنتائج
 │   └── sidebar_view.py     # الشريط الجانبي والإعدادات والسجل
 ├── tests/
-│   └── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
+│   ├── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
 │   └── test_service.py      # اختبارات طبقة تنفيذ العمليات
+├── tools/
+│   └── benchmark.py         # قياس أداء الخوارزميات دون اعتماديات إضافية
 ├── CryptoEdu.spec          # إعداد بناء PyInstaller
 ├── cryptoedu.ico           # أيقونة التطبيق
 ├── requirements.txt        # الاعتماديات
@@ -313,6 +315,9 @@ pyinstaller CryptoEdu.spec
 - [x] فصل تبويب شرح الكود وتلوينه في `ui/code_view.py` عبر `CodeViewMixin`.
 - [x] فصل بناء تبويب التشفير في `ui/crypto_view.py` عبر `CryptoViewMixin`.
 - [x] فصل بناء الشريط الجانبي في `ui/sidebar_view.py` عبر `SidebarViewMixin`.
+- [x] إزالة نسخ الواجهة الاحتياطية المكررة من `main.py` والاعتماد على وحدات `ui` الرسمية.
+- [x] إضافة Benchmark قابل لإعادة التشغيل في `tools/benchmark.py`.
+- [x] التحقق من أداء الخوارزميات الأساسية ومدخلات DES وS-DES الصحيحة.
 
 ---
 
@@ -360,6 +365,20 @@ pyinstaller CryptoEdu.spec
 - إضافة ترخيص واضح للمشروع.
 - إضافة نظام إصدارات وملف `CHANGELOG.md`.
 - إضافة قوالب Issues وPull Requests.
+
+### نتائج P3 الحالية
+
+- أصبح `main.py` أصغر بعد إزالة تعريفات fallback المكررة، مع إبقاء `AppSizes` و`StatusBar` من وحداتهما الرسمية.
+- تم الحفاظ على Cache الخاص بمفاتيح DES ونتيجة Diffie-Hellman، مع استمرار اختبارات Cache الحالية.
+- نجح بناء PyInstaller باستخدام `CryptoEdu.spec`، وبدأت النسخة التنفيذية تحت Xvfb دون أخطاء مباشرة.
+- يمكن تشغيل قياس الأداء محليًا باستخدام:
+
+```bash
+python tools/benchmark.py
+python tools/benchmark.py --repeats 300 --case DES
+```
+
+الأداة تقريرية ولا تفشل البناء بسبب اختلاف سرعة الأجهزة أو حمل المعالج.
 
 ---
 
