@@ -5,7 +5,6 @@ import os
 import pyperclip
 import queue
 from concurrent.futures import ThreadPoolExecutor
-from tkinter import messagebox
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -565,7 +564,6 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self._update_code_labels()
 
     def _update_crypto_labels(self):
-        T = self._T
         t = TRANSLATIONS[self.lang]
         c = self.current_cipher
         if hasattr(self, 'cipher_title_label'):

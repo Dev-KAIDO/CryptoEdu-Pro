@@ -13,6 +13,13 @@ build/
 dist/
 *.egg-info/
 
+# Test and quality reports
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
 # IDE
 .vscode/
 
@@ -22,5 +29,6 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
 # Nested repository
 /How-Cyber-Text-or-Data/

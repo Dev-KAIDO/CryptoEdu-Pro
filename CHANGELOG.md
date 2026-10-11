@@ -1,0 +1,26 @@
+# Changelog
+
+يستخدم هذا الملف [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+### Added
+
+- إعداد `pyproject.toml` لفحص Ruff واكتشاف الاختبارات.
+- اختبار UI Smoke قابل للتخطي تلقائيًا عند غياب بيئة رسومية.
+- سير عمل GitHub Actions للفحص والاختبارات والبناء.
+- أداة Benchmark في `tools/benchmark.py`.
+
+### Changed
+
+- تنظيم سكربتات الإصلاح التاريخية داخل `tools/legacy/`.
+- إزالة تعريفات واجهة fallback المكررة من `main.py`.
+
+## [0.1.0] - 2026-10-11
+
+### Added
+
+- واجهة تعليمية ثنائية اللغة للتشفير الكلاسيكي والحديث.
+- طبقة خدمة مستقلة وعمليات Worker وCache محدود.
+- اختبارات رجوع والتحقق من المدخلات للخوارزميات وطبقة الخدمة.
+- بناء PyInstaller عبر `CryptoEdu.spec`.

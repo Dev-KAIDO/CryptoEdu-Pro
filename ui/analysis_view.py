@@ -5,7 +5,6 @@ The mixin relies on the host application for shared state such as ``_T``,
 walkthroughs live here so the main window remains focused on application flow.
 """
 
-import bisect
 import math
 import re
 
@@ -13,7 +12,6 @@ import customtkinter as ctk
 
 from core.algorithms import CryptoCore
 from core.textutils import fix_bidi
-from ui.styles import AppSizes
 
 
 class AnalysisViewMixin:
@@ -160,7 +158,6 @@ class AnalysisViewMixin:
 
         cipher = self.current_cipher
         T = self._T
-        op_ar = (self._L("التشفير", "Encryption") if operation == "encrypt" else self._L("فك التشفير", "Decryption"))
 
         if cipher == "Caesar":
             self._analyze_caesar(input_text, operation)
@@ -203,7 +200,6 @@ class AnalysisViewMixin:
             pass
 
     def _analysis_hero(self, title, subtitle, color, icon):
-        T = self._T
         hero = ctk.CTkFrame(self.analysis_content, fg_color=color, corner_radius=12, height=66)
         hero.pack(fill="x", pady=8, padx=6)
         hero.pack_propagate(False)
@@ -707,14 +703,12 @@ class AnalysisViewMixin:
         canvas.create_text(ox + 13, 116, text=row_note, font=("Cascadia Code", 9), fill=T["TEXT_GRAY"], anchor="w")
 
     def _rsa_power_canvas(self, m_text, m, c, e, n, color="#7c3aed"):
-        T = self._T
         canvas = self._analysis_canvas(340, 96)
         steps = [(m_text, str(m), color), ("\u2191", "m\u1d40", "#a78bfa"), (str(c), "c = m\u1d40 mod n", "#34d399")]
         x = 12
         for idx, (top, bot, col) in enumerate(steps):
             canvas.create_text(x, 26, text=top, font=("Cascadia Code", 16, "bold"), fill="#ffffff", anchor="w")
             canvas.create_text(x, 46, text=bot, font=("Cascadia Code", 9, "bold"), fill=col, anchor="w")
-            w = max(30, len(top) * 9 + 6)
             if idx < len(steps) - 1:
                 arrow_x = x + len(top) * 9 + 6
                 canvas.create_line(arrow_x, 34, arrow_x + 22, 34, arrow="last", width=3, fill="#a78bfa")
@@ -980,8 +974,8 @@ class AnalysisViewMixin:
             self._vigenere_strip(fk, ord(fch) - 65, "#f59e0b")
             self._analysis_note(
                 self._L(
-                    f"المفتاح يتكرر دورياً: كُل حرف من النص يُزاح بإزاحة الحرف المقابل له من المفتاح (مثلاً K = 10)، ثم يُدوَّر الناتج حول دائرة الأبجدية بنفس فكرة قيصر.",
-                    f"The keyword repeats cyclically: each plaintext letter is shifted by its matching keyword letter (e.g. K = 10), then the result wraps around the alphabet circle just like Caesar."
+                    "المفتاح يتكرر دورياً: كُل حرف من النص يُزاح بإزاحة الحرف المقابل له من المفتاح (مثلاً K = 10)، ثم يُدوَّر الناتج حول دائرة الأبجدية بنفس فكرة قيصر.",
+                    "The keyword repeats cyclically: each plaintext letter is shifted by its matching keyword letter (e.g. K = 10), then the result wraps around the alphabet circle just like Caesar."
                 ),
                 "#f59e0b",
                 "\U0001f504"
@@ -1191,7 +1185,6 @@ class AnalysisViewMixin:
     def _analyze_diffiehellman(self, input_text, output_text):
         T = self._T
         try:
-            parts = input_text.split()
             p, g, a, b = int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), int(self.key4.get())
         except Exception:
             return
@@ -1270,6 +1263,7 @@ class AnalysisViewMixin:
         ), font=("Cascadia Code", 12, "bold"), text_color="#6ee7b7", anchor="w").pack(fill="x", padx=12, pady=(0, 8))
 
     def _analyze_rsa(self, input_text, output_text, operation):
+        T = self._T
         p, q, e = int(self.key1.get()), int(self.key2.get()), int(self.key3.get())
         n = p * q
         phi = (p - 1) * (q - 1)
@@ -1361,7 +1355,6 @@ class AnalysisViewMixin:
             )
             return
 
-        nbits = 8
         color = "#0ea5e9"
         self._analysis_hero(
             self._L("\U0001f9ed شفرة S-DES — خوارزمية كلاسيكية مبسّطة", "\U0001f9ed S-DES Cipher — Classic Simplified Algorithm"),
@@ -1550,7 +1543,7 @@ class AnalysisViewMixin:
                 f"\U0001f9ee Round 1 detail (K\u2081 = {keys[0]})"
             ), font=("Segoe UI", 13, "bold"), text_color="#fcd34d").pack(anchor="w", padx=12, pady=(8, 2))
             self._des_math_row(detail, "IP", f"{pt} → {block0}", ("L0", block0[:32]), ("R0", block0[32:]), "#f59e0b")
-            self._des_math_row(detail, "E", fix_bidi(f"R0 → 48 بت"), ("E(R0)", CryptoCore._des_permute(block0[32:], CryptoCore.DES_E)), None, "#fbbf24")
+            self._des_math_row(detail, "E", fix_bidi("R0 → 48 بت"), ("E(R0)", CryptoCore._des_permute(block0[32:], CryptoCore.DES_E)), None, "#fbbf24")
             expanded = CryptoCore._des_permute(block0[32:], CryptoCore.DES_E)
             xored = CryptoCore._des_xor(expanded, keys[0])
             self._des_math_row(detail, "⊕", "", ("E(R0)⊕K1", xored), None, "#fb923c")

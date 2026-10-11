@@ -165,7 +165,6 @@ class CodeViewMixin:
             numbered_text = '\n'.join(numbered_parts)
             textbox.insert("1.0", numbered_text)
 
-            import re
 
             for tag_name in ["keyword", "builtin", "funcdef", "string", "docstring", "number", "comment", "operator", "decorator"]:
                 try:
@@ -221,7 +220,7 @@ class CodeViewMixin:
             ln_box.delete("1.0", "end")
             ln_box.insert("1.0", linenum_text)
             ln_box.configure(state="disabled")
-        except Exception as e:
+        except Exception:
             try:
                 textbox = self.code_display._textbox
                 textbox.delete("1.0", "end")
