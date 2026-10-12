@@ -2,6 +2,7 @@
 
 import customtkinter as ctk
 
+from core.registry import algorithm_names
 from ui.styles import AppSizes
 from ui.translations import TRANSLATIONS
 
@@ -118,7 +119,7 @@ class SidebarViewMixin:
 
         self.cipher_menu = ctk.CTkOptionMenu(
             cipher_section,
-            values=["Caesar", "Affine", "Vigenere", "Playfair", "Hill", "DiffieHellman", "RSA", "SDES", "DES"],
+            values=list(algorithm_names()),
             command=self.change_cipher,
             font=("Segoe UI", 14, "bold"),
             fg_color=T["PRIMARY"],

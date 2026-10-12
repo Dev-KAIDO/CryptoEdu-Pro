@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.algorithms import CryptoCore
+from core.registry import get_algorithm, key_defaults
 from core.service import CryptoOperationService
 from ui.analysis_view import AnalysisViewMixin
 from ui.key_fields import KeyFieldsMixin
@@ -507,11 +508,14 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self.status_bar.set_status(TRANSLATIONS[self.lang]["status_ready"])
 
     def change_cipher(self, new_cipher):
+        get_algorithm(new_cipher)
         if getattr(self, "_crypto_busy", False):
             self._crypto_job_id += 1
             self._crypto_busy = False
             self._set_crypto_controls_enabled(True)
         self.current_cipher = new_cipher
+        if hasattr(self, "cipher_menu") and self.cipher_menu.get() != new_cipher:
+            self.cipher_menu.set(new_cipher)
         self._analysis_ready = False
         # ألغِ أي بناء تحليل مؤجل أو تجزئة عجلات قديمة حتى لا تُبني نتيجة خاطئة أو تختفي الواجهات
         self._cancel_deferred_analysis()
@@ -750,31 +754,15 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
     # ─── الاختبار السريع ───
     def _quick_test(self):
-        test_data = {
-            "Caesar": {"text": "HELLO WORLD", "key": "3"},
-            "Affine": {"text": "HELLO WORLD", "key": "7", "key2": "10"},
-            "Vigenere": {"text": "HELLO WORLD", "key": "KEY"},
-            "Playfair": {"text": "HELLO WORLD", "key": "SECRET"},
-            "Hill": {"text": "HELLO WORLD", "key": "HILL"},
-            "DiffieHellman": {"text": "Diffie-Hellman Key Exchange", "key": "23", "key2": "5", "key3": "6", "key4": "15"},
-            "RSA": {"text": "mohammed", "key": "23", "key2": "113", "key3": "207"},
-            "SDES": {"text": "10101101", "key": "1010110011"},
-            "DES": {"text": "0000000100100011010001010110011110001001101010111100110111101111", "key": "0001001100110100010101110111100110011011101111001101111111110001"},
-        }
-        data = test_data.get(self.current_cipher, test_data["Caesar"])
+        spec = get_algorithm(self.current_cipher)
+        data = {"text": spec.quick_text, "keys": key_defaults(self.current_cipher)}
         self.input_box.delete("1.0", "end")
         self.input_box.insert("1.0", data["text"])
-        self.key1.delete(0, "end")
-        self.key1.insert(0, data["key"])
-        if getattr(self, 'key2', None) is not None and "key2" in data:
-            self.key2.delete(0, "end")
-            self.key2.insert(0, data["key2"])
-        if getattr(self, 'key3', None) is not None and "key3" in data:
-            self.key3.delete(0, "end")
-            self.key3.insert(0, data["key3"])
-        if getattr(self, 'key4', None) is not None and "key4" in data:
-            self.key4.delete(0, "end")
-            self.key4.insert(0, data["key4"])
+        for index, value in enumerate(data["keys"], start=1):
+            field = getattr(self, f"key{index}", None)
+            if field is not None:
+                field.delete(0, "end")
+                field.insert(0, value)
         self.update_char_count()
         self.run_encrypt()
 
