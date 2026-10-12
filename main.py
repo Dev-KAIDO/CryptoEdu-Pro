@@ -3,12 +3,12 @@ import customtkinter as ctk
 import sys
 import os
 import pyperclip
-import queue
-from concurrent.futures import ThreadPoolExecutor
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.algorithms import CryptoCore
+from core.app_state import AppState
+from core.controller import CryptoController
 from core.registry import get_algorithm, key_defaults
 from core.service import CryptoOperationService
 from ui.analysis_view import AnalysisViewMixin
@@ -128,13 +128,68 @@ THEMES = {
 
 class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMixin, CryptoViewMixin, ctk.CTk):
     THEME_NAMES = tuple(THEMES.keys())
+
+    @property
+    def lang(self):
+        return self.app_state.lang
+
+    @lang.setter
+    def lang(self, value):
+        self.app_state.lang = value
+
+    @property
+    def current_cipher(self):
+        return self.app_state.current_cipher
+
+    @current_cipher.setter
+    def current_cipher(self, value):
+        self.app_state.current_cipher = value
+
+    @property
+    def current_theme_name(self):
+        return self.app_state.current_theme_name
+
+    @current_theme_name.setter
+    def current_theme_name(self, value):
+        self.app_state.current_theme_name = value
+
+    @property
+    def operations_count(self):
+        return self.app_state.operations_count
+
+    @operations_count.setter
+    def operations_count(self, value):
+        self.app_state.operations_count = value
+
+    @property
+    def _crypto_busy(self):
+        return self.app_state.crypto_busy
+
+    @_crypto_busy.setter
+    def _crypto_busy(self, value):
+        self.app_state.crypto_busy = value
+
+    @property
+    def _crypto_job_id(self):
+        return self.app_state.crypto_job_id
+
+    @_crypto_job_id.setter
+    def _crypto_job_id(self, value):
+        self.app_state.crypto_job_id = value
+
+    @property
+    def _closing(self):
+        return self.app_state.closing
+
+    @_closing.setter
+    def _closing(self, value):
+        self.app_state.closing = value
+
     def __init__(self):
         super().__init__()
 
-        self.lang = "AR"
-        self.current_cipher = "Caesar"
-        self.operations_count = 0
-        self.current_theme_name = "Midnight"
+        self.app_state = AppState()
+        self.controller = CryptoController(self.app_state)
         self._T = THEMES[self.current_theme_name]
 
         self.title(TRANSLATIONS[self.lang]["title"])
@@ -159,11 +214,6 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self._code_cache = {}
         self._analysis_build_after = None
         self._analysis_defer_after = None
-        self._crypto_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="crypto")
-        self._crypto_job_id = 0
-        self._crypto_busy = False
-        self._closing = False
-        self._crypto_results = queue.Queue()
         self.setup_sidebar()
         self.setup_main_content()
         self.setup_crypto_tab()
@@ -510,8 +560,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
     def change_cipher(self, new_cipher):
         get_algorithm(new_cipher)
         if getattr(self, "_crypto_busy", False):
-            self._crypto_job_id += 1
-            self._crypto_busy = False
+            self.controller.cancel_current()
             self._set_crypto_controls_enabled(True)
         self.current_cipher = new_cipher
         if hasattr(self, "cipher_menu") and self.cipher_menu.get() != new_cipher:
@@ -622,43 +671,33 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         keys = self.get_key_values()
         cipher = self.current_cipher
         lang = self.lang
-        self._crypto_busy = True
-        self._crypto_job_id += 1
-        job_id = self._crypto_job_id
         self._set_crypto_controls_enabled(False)
         self.status_bar.set_status(translations[status_key], "#f59e0b")
 
-        future = self._crypto_executor.submit(
-            CryptoOperationService.execute,
-            cipher,
-            text,
-            keys,
-            method_suffix,
-            lang,
-        )
-        future.add_done_callback(
-            lambda completed: self._crypto_results.put((job_id, cipher, text, operation, completed))
-            if not self._closing else None
-        )
+        job_id = self.controller.submit(cipher, text, keys, method_suffix, lang)
+        if job_id is None:
+            self._set_crypto_controls_enabled(True)
 
     def _poll_crypto_results(self):
         """يفرغ نتائج العمال داخل خيط Tkinter الرئيسي فقط."""
         if self._closing:
             return
-        try:
-            while True:
-                item = self._crypto_results.get_nowait()
-                self._finish_crypto_operation(*item)
-        except queue.Empty:
-            pass
+        for result in self.controller.poll_results():
+            self._finish_crypto_operation(
+                result.job_id,
+                result.cipher,
+                result.text,
+                result.operation,
+                result.future,
+            )
         self.after(50, self._poll_crypto_results)
 
     def _finish_crypto_operation(self, job_id, cipher, text, operation, future):
         """يعيد نتيجة Worker إلى Tkinter فقط إذا كانت ما زالت أحدث عملية."""
-        if self._closing or job_id != self._crypto_job_id:
+        if not self.controller.is_current(job_id):
             return
         translations = TRANSLATIONS[self.lang]
-        self._crypto_busy = False
+        self.controller.mark_finished(job_id)
         self._set_crypto_controls_enabled(True)
         try:
             result = future.result()
@@ -747,9 +786,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         return self.update_char_count(event)
 
     def on_closing(self):
-        self._closing = True
-        self._crypto_job_id += 1
-        self._crypto_executor.shutdown(wait=False, cancel_futures=True)
+        self.controller.close()
         self.destroy()
 
     # ─── الاختبار السريع ───

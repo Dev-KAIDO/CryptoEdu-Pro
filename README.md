@@ -209,6 +209,8 @@ CryptoEdu-Pro/
 ├── main.py                 # نقطة التشغيل وواجهة التطبيق الرئيسية
 ├── core/
 │   ├── algorithms.py       # تنفيذ الخوارزميات ومواد الشرح
+│   ├── app_state.py        # الحالة العامة القابلة للتغيير دون Widgets
+│   ├── controller.py       # إدارة Worker والعمليات والنتائج
 │   ├── registry.py         # السجل المركزي لتعريف الخوارزميات وحقولها
 │   ├── education.py        # أمثلة الكود والشرح التعليمي للواجهة
 │   ├── service.py          # طبقة تنفيذ مستقلة عن واجهة المستخدم
@@ -224,6 +226,7 @@ CryptoEdu-Pro/
 │   └── sidebar_view.py     # الشريط الجانبي والإعدادات والسجل
 ├── tests/
 │   ├── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
+│   ├── test_controller.py   # اختبارات دورة حياة العمليات الخلفية
 │   ├── test_service.py      # اختبارات طبقة تنفيذ العمليات
 │   ├── test_registry.py     # اختبارات عقد Registry والتوافق
 │   └── test_ui_smoke.py     # اختبار واجهة اختياري عبر Xvfb
@@ -250,6 +253,9 @@ flowchart LR
     C --> E[CryptoOperationService]
     E --> R[Algorithm Registry]
     R --> K[Key Fields and Cipher Menu]
+    A --> S[AppState]
+    A --> Ctl[CryptoController]
+    Ctl --> E
     E --> F[CryptoCore]
     F --> G[Classical Ciphers]
     F --> H[RSA / Diffie-Hellman]
@@ -332,6 +338,10 @@ pyinstaller CryptoEdu.spec
 - [x] ربط طبقة الخدمة بالـ Registry بدل شروط أسماء الخوارزميات المتفرقة.
 - [x] جعل حقول المفاتيح وقائمة الخوارزميات والاختبار السريع تُبنى من تعريف Registry.
 - [x] إضافة اختبارات Registry، ليصبح إجمالي الاختبارات 32 اختبارًا.
+- [x] استخراج `AppState` من نافذة Tkinter مع إبقاء خصائص التوافق للـ Mixins.
+- [x] استخراج `CryptoController` لإدارة Worker وQueue والإلغاء ودورة حياة العملية.
+- [x] منع Mixins من امتلاك دورة حياة Worker مباشرة، مع إبقاء واجهة `CryptoApp` الحالية مستقرة.
+- [x] إضافة اختبارات Controller، ليصبح إجمالي الاختبارات 35 اختبارًا.
 
 ---
 
