@@ -3,7 +3,6 @@
 import customtkinter as ctk
 
 from ui.styles import AppSizes
-from ui.translations import TRANSLATIONS
 
 
 class CryptoViewMixin:
@@ -12,7 +11,7 @@ class CryptoViewMixin:
             self._update_crypto_labels()
             return
         T = self._T
-        t = TRANSLATIONS[self.lang]
+        t = self.language_manager.current
 
         for widget in self.tab_crypto.winfo_children():
             widget.destroy()

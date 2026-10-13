@@ -4,7 +4,6 @@ import customtkinter as ctk
 
 from core.registry import algorithm_names
 from ui.styles import AppSizes
-from ui.translations import TRANSLATIONS
 
 
 class SidebarViewMixin:
@@ -46,7 +45,7 @@ class SidebarViewMixin:
         self.author_card.pack(pady=(8, 20), padx=20, fill="x")
         self.author = ctk.CTkLabel(
             self.author_card,
-            text=TRANSLATIONS[self.lang]["author"],
+            text=self.language_manager.current["author"],
             font=("Segoe UI", 16, "bold"),
             text_color=T["PRIMARY_LIGHT"]
         )
@@ -59,7 +58,7 @@ class SidebarViewMixin:
 
         ctk.CTkLabel(
             lang_section,
-            text="\U0001f310 " + TRANSLATIONS[self.lang]["language"],
+            text="\U0001f310 " + self.language_manager.current["language"],
             font=("Segoe UI", 11),
             text_color=T["TEXT_GRAY"]
         ).pack(anchor="w", pady=(0, 8))
@@ -112,7 +111,7 @@ class SidebarViewMixin:
 
         ctk.CTkLabel(
             cipher_section,
-            text="\u2699\ufe0f " + TRANSLATIONS[self.lang]["select_cipher"],
+            text="\u2699\ufe0f " + self.language_manager.current["select_cipher"],
             font=("Segoe UI", 11),
             text_color=T["TEXT_GRAY"]
         ).pack(anchor="w", pady=(0, 8))
@@ -143,11 +142,11 @@ class SidebarViewMixin:
 
         self.cipher_info_label = ctk.CTkLabel(
             self.cipher_info_card,
-            text=TRANSLATIONS[self.lang][f"desc_{self.current_cipher.lower()}"],
+            text=self.language_manager.current[f"desc_{self.current_cipher.lower()}"],
             font=("Segoe UI", 11),
             text_color=T["TEXT_LIGHT"],
             wraplength=220,
-            justify="right" if self.lang == "AR" else "left"
+            justify="right" if self.language_manager.is_rtl else "left"
         )
         self.cipher_info_label.pack(padx=15, pady=15)
 
@@ -158,14 +157,14 @@ class SidebarViewMixin:
         self.operations_card.pack(fill="x", pady=5)
 
         ctk.CTkLabel(self.operations_card, text="\U0001f4ca", font=("Segoe UI", 14)).pack(side="left", padx=10, pady=8)
-        ops_text = "عمليات" if self.lang == "AR" else "operations"
+        ops_text = "عمليات" if self.language_manager.is_rtl else "operations"
         self.ops_label = ctk.CTkLabel(self.operations_card, text=f"0 {ops_text}", font=("Segoe UI", 11), text_color=T["TEXT_GRAY"])
         self.ops_label.pack(side="left", pady=8)
 
         # === زر الاختبار السريع ===
         test_btn = ctk.CTkButton(
             stats_frame,
-            text="\U0001f9ea " + ("اختبار سريع" if self.lang == "AR" else "Quick Test"),
+            text="\U0001f9ea " + ("اختبار سريع" if self.language_manager.is_rtl else "Quick Test"),
             command=self._quick_test,
             font=("Segoe UI", 12, "bold"),
             fg_color=T["PRIMARY"],
@@ -181,7 +180,7 @@ class SidebarViewMixin:
 
         history_header = ctk.CTkFrame(self.history_frame, fg_color="transparent")
         history_header.pack(fill="x", padx=10, pady=(8, 2))
-        ctk.CTkLabel(history_header, text="\U0001f4cb " + ("السجل" if self.lang == "AR" else "History"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_LIGHT"]).pack(side="left")
+        ctk.CTkLabel(history_header, text="\U0001f4cb " + ("السجل" if self.language_manager.is_rtl else "History"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_LIGHT"]).pack(side="left")
         self.history_clear_btn = ctk.CTkButton(history_header, text="\U0001f5d1\ufe0f", width=25, height=25, font=("Segoe UI", 10), fg_color="transparent", hover_color=T["ERROR"], command=self._clear_history)
         self.history_clear_btn.pack(side="right")
 
@@ -193,7 +192,7 @@ class SidebarViewMixin:
         # === زر المساعدة ===
         help_btn = ctk.CTkButton(
             stats_frame,
-            text="\u2753 " + ("مساعدة" if self.lang == "AR" else "Help"),
+            text="\u2753 " + ("مساعدة" if self.language_manager.is_rtl else "Help"),
             command=self._show_help,
             font=("Segoe UI", 12, "bold"),
             fg_color=T["ACCENT"],

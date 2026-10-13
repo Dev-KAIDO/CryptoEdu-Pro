@@ -224,10 +224,12 @@ CryptoEdu-Pro/
 │   ├── code_view.py        # تبويب الكود الكامل والشرح والتلوين
 │   ├── crypto_view.py      # تبويب التشفير وبطاقات الإدخال والنتائج
 │   ├── sidebar_view.py     # الشريط الجانبي والإعدادات والسجل
+│   ├── language_manager.py # اختيار اللغة والترجمة واتجاه RTL
 │   └── theme_manager.py    # تعريفات الثيمات واختيارها والتحقق منها
 ├── tests/
 │   ├── test_algorithms.py  # اختبارات الرجوع والتحقق من المدخلات
 │   ├── test_controller.py   # اختبارات دورة حياة العمليات الخلفية
+│   ├── test_language_manager.py # اختبارات إدارة اللغات والترجمة
 │   ├── test_service.py      # اختبارات طبقة تنفيذ العمليات
 │   ├── test_theme_manager.py # اختبارات إدارة الثيمات
 │   ├── test_registry.py     # اختبارات عقد Registry والتوافق
@@ -347,6 +349,10 @@ pyinstaller CryptoEdu.spec
 - [x] استخراج تعريفات الألوان واختيار الثيمات إلى `ui/theme_manager.py`.
 - [x] جعل تعريفات الثيمات غير قابلة للتعديل من Views أثناء التشغيل.
 - [x] إضافة اختبارات ThemeManager، ليصبح إجمالي الاختبارات 38 اختبارًا.
+- [x] استخراج اختيار اللغة والنصوص واتجاه RTL إلى `ui/language_manager.py`.
+- [x] منع Views من الوصول المباشر إلى قاموس `TRANSLATIONS`.
+- [x] توحيد `localize` و`bidi` عبر LanguageManager للنصوص الديناميكية.
+- [x] إضافة اختبارات LanguageManager، ليصبح إجمالي الاختبارات 42 اختبارًا.
 
 ---
 

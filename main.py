@@ -16,9 +16,9 @@ from ui.key_fields import KeyFieldsMixin
 from ui.code_view import CodeViewMixin
 from ui.crypto_view import CryptoViewMixin
 from ui.sidebar_view import SidebarViewMixin
+from ui.language_manager import LanguageManager
 from ui.theme_manager import ThemeManager
 from core.textutils import fix_bidi
-from ui.translations import TRANSLATIONS
 
 from ui.styles import AppSizes
 from ui.widgets import StatusBar
@@ -29,10 +29,11 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
     @property
     def lang(self):
-        return self.app_state.lang
+        return self.language_manager.current_code
 
     @lang.setter
     def lang(self, value):
+        self.language_manager.select(value)
         self.app_state.lang = value
 
     @property
@@ -88,10 +89,11 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
         self.app_state = AppState()
         self.controller = CryptoController(self.app_state)
+        self.language_manager = LanguageManager(self.app_state.lang)
         self.theme_manager = ThemeManager(self.current_theme_name)
         self._T = self.theme_manager.current
 
-        self.title(TRANSLATIONS[self.lang]["title"])
+        self.title(self.language_manager.current["title"])
         self.geometry("1400x900")
         self.minsize(1200, 700)
         ctk.set_appearance_mode("dark")
@@ -291,7 +293,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         tab_bar.grid_columnconfigure(1, weight=1)
         tab_bar.grid_propagate(False)
 
-        tab_labels = TRANSLATIONS[self.lang]
+        tab_labels = self.language_manager.current
 
         self._tab_btn_crypto = ctk.CTkButton(
             tab_bar,
@@ -356,13 +358,11 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
 
     def _L(self, ar, en):
-        return en if self.lang == "EN" else fix_bidi(ar)
+        return self.language_manager.localize(ar, en)
 
     def _fb(self, text):
         """Fix bidirectional text for Arabic. Use for direct Arabic strings outside _L."""
-        if self.lang == "AR":
-            return fix_bidi(text)
-        return text
+        return self.language_manager.bidi(text)
 
 
 
@@ -436,26 +436,26 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
     def change_language(self, new_lang):
         self.lang = new_lang
-        self.title(TRANSLATIONS[self.lang]["title"])
+        self.title(self.language_manager.current["title"])
 
-        tab_labels = TRANSLATIONS[self.lang]
+        tab_labels = self.language_manager.current
         if hasattr(self, '_tab_btn_crypto'):
             self._tab_btn_crypto.configure(text="\U0001f510  " + tab_labels["tab_crypto"])
         if hasattr(self, '_tab_btn_code'):
             self._tab_btn_code.configure(text="\U0001f4dd  " + tab_labels["tab_code"])
 
-        self.author.configure(text=TRANSLATIONS[self.lang]["author"])
+        self.author.configure(text=self.language_manager.current["author"])
 
         if hasattr(self, 'cipher_info_label'):
             self.cipher_info_label.configure(
-                text=TRANSLATIONS[self.lang][f"desc_{self.current_cipher.lower()}"],
-                justify="right" if self.lang == "AR" else "left"
+                text=self.language_manager.current[f"desc_{self.current_cipher.lower()}"],
+                justify="right" if self.language_manager.is_rtl else "left"
             )
 
         self._update_crypto_labels()
         self.update_keys()
         self._update_code_labels()
-        self.status_bar.set_status(TRANSLATIONS[self.lang]["status_ready"])
+        self.status_bar.set_status(self.language_manager.current["status_ready"])
 
     def change_cipher(self, new_cipher):
         get_algorithm(new_cipher)
@@ -506,10 +506,10 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             pass
 
         if hasattr(self, 'cipher_info_label'):
-            t = TRANSLATIONS[self.lang]
+            t = self.language_manager.current
             self.cipher_info_label.configure(
                 text=t[f"desc_{self.current_cipher.lower()}"],
-                justify="right" if self.lang == "AR" else "left"
+                justify="right" if self.language_manager.is_rtl else "left"
             )
 
         self._update_crypto_labels()
@@ -517,7 +517,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self._update_code_labels()
 
     def _update_crypto_labels(self):
-        t = TRANSLATIONS[self.lang]
+        t = self.language_manager.current
         c = self.current_cipher
         if hasattr(self, 'cipher_title_label'):
             title_text = t[c.lower()]
@@ -544,7 +544,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             self.clear_btn.configure(text="\U0001f5d1\ufe0f " + t["clear"])
 
     def _update_code_labels(self):
-        t = TRANSLATIONS[self.lang]
+        t = self.language_manager.current
         if hasattr(self, 'code_title_label'):
             self.code_title_label.configure(text="\U0001f4dd " + t["code_full"])
         if hasattr(self, 'expl_title_label'):
@@ -557,11 +557,11 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         """ينفذ عملية التشفير أو فك التشفير عبر مسار موحد."""
         text = self.input_box.get("1.0", "end-1c")
         if self.current_cipher != "DiffieHellman" and not text.strip():
-            message = "الرجاء إدخال النص!" if self.lang == "AR" else "Please enter text!"
+            message = "الرجاء إدخال النص!" if self.language_manager.is_rtl else "Please enter text!"
             self.status_bar.set_status("⚠️ " + message, "#f59e0b")
             return
 
-        translations = TRANSLATIONS[self.lang]
+        translations = self.language_manager.current
         status_key = "status_encrypting" if operation == "encrypt" else "status_decrypting"
         method_suffix = "encrypt" if operation == "encrypt" else "decrypt"
 
@@ -596,7 +596,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         """يعيد نتيجة Worker إلى Tkinter فقط إذا كانت ما زالت أحدث عملية."""
         if not self.controller.is_current(job_id):
             return
-        translations = TRANSLATIONS[self.lang]
+        translations = self.language_manager.current
         self.controller.mark_finished(job_id)
         self._set_crypto_controls_enabled(True)
         try:
@@ -643,7 +643,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         result = self.output_box.get("1.0", "end-1c")
         if result.strip():
             pyperclip.copy(result)
-            self.status_bar.set_status("\u2705 " + TRANSLATIONS[self.lang]["status_copied"], "#10b981")
+            self.status_bar.set_status("\u2705 " + self.language_manager.current["status_copied"], "#10b981")
 
     def copy_code(self):
         code_text = CryptoCore.get_full_code(self.current_cipher)
@@ -660,13 +660,13 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self.input_box.insert("1.0", output_text)
 
         self.update_char_count()
-        self.status_bar.set_status("\U0001f504 " + ("\u062a\u0645 \u0646\u0642\u0644 \u0627\u0644\u0646\u062a\u064a\u062c\u0629 \u0625\u0644\u0649 \u062e\u0627\u0646\u0629 \u0627\u0644\u0646\u0635!" if self.lang == "AR" else "Result moved to input!"), "#06b6d4")
+        self.status_bar.set_status("\U0001f504 " + ("\u062a\u0645 \u0646\u0642\u0644 \u0627\u0644\u0646\u062a\u064a\u062c\u0629 \u0625\u0644\u0649 \u062e\u0627\u0646\u0629 \u0627\u0644\u0646\u0635!" if self.language_manager.is_rtl else "Result moved to input!"), "#06b6d4")
 
     def clear_texts(self):
         self.input_box.delete("1.0", "end")
         self.output_box.delete("1.0", "end")
         self.update_char_count()
-        self.status_bar.set_status(TRANSLATIONS[self.lang]["status_ready"])
+        self.status_bar.set_status(self.language_manager.current["status_ready"])
 
     def update_char_count(self, event=None):
         try:
@@ -719,7 +719,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         for w in self.history_list_frame.winfo_children():
             w.destroy()
         if not self.history_items:
-            no_data = "لا توجد عمليات" if self.lang == "AR" else "No operations"
+            no_data = "لا توجد عمليات" if self.language_manager.is_rtl else "No operations"
             ctk.CTkLabel(self.history_list_frame, text=no_data, font=("Segoe UI", 10), text_color=T["TEXT_MUTED"]).pack(pady=10)
             return
         for item in self.history_items:
@@ -754,13 +754,13 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             ]
         }
         dialog = ctk.CTkToplevel(self)
-        dialog.title("\u2753 " + (fix_bidi("مساعدة") if self.lang == "AR" else "Help"))
+        dialog.title("\u2753 " + (fix_bidi("مساعدة") if self.language_manager.is_rtl else "Help"))
         dialog.geometry("450x400")
         dialog.configure(fg_color=self._T["BG_DARK"])
         dialog.transient(self)
         dialog.grab_set()
 
-        title = ctk.CTkLabel(dialog, text="\u2753 " + (fix_bidi("نصائح مساعدة") if self.lang == "AR" else "Help Tips"), font=("Segoe UI", 20, "bold"), text_color=self._T["TEXT_WHITE"])
+        title = ctk.CTkLabel(dialog, text="\u2753 " + (fix_bidi("نصائح مساعدة") if self.language_manager.is_rtl else "Help Tips"), font=("Segoe UI", 20, "bold"), text_color=self._T["TEXT_WHITE"])
         title.pack(pady=20)
 
         for icon, heading, desc in tips[self.lang]:
@@ -769,9 +769,9 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="x", padx=12, pady=10)
             ctk.CTkLabel(inner, text=f"{icon} {heading}", font=("Segoe UI", 13, "bold"), text_color=self._T["PRIMARY_LIGHT"]).pack(anchor="w")
-            ctk.CTkLabel(inner, text=desc, font=("Segoe UI", 11), text_color=self._T["TEXT_LIGHT"], wraplength=350, justify="right" if self.lang == "AR" else "left").pack(anchor="w", pady=(2, 0))
+            ctk.CTkLabel(inner, text=desc, font=("Segoe UI", 11), text_color=self._T["TEXT_LIGHT"], wraplength=350, justify="right" if self.language_manager.is_rtl else "left").pack(anchor="w", pady=(2, 0))
 
-        close_btn = ctk.CTkButton(dialog, text="\u2716 " + (fix_bidi("إغلاق") if self.lang == "AR" else "Close"), command=dialog.destroy, fg_color=self._T["ERROR"], hover_color=self._T["ERROR_LIGHT"], corner_radius=8, height=35)
+        close_btn = ctk.CTkButton(dialog, text="\u2716 " + (fix_bidi("إغلاق") if self.language_manager.is_rtl else "Close"), command=dialog.destroy, fg_color=self._T["ERROR"], hover_color=self._T["ERROR_LIGHT"], corner_radius=8, height=35)
         close_btn.pack(pady=15)
 
 if __name__ == "__main__":

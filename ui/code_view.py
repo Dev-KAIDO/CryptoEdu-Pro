@@ -8,7 +8,6 @@ import customtkinter as ctk
 from core.algorithms import CryptoCore
 from core.textutils import fix_bidi
 from ui.styles import AppSizes
-from ui.translations import TRANSLATIONS
 
 
 class CodeViewMixin:
@@ -44,7 +43,7 @@ class CodeViewMixin:
 
         self.code_title_label = ctk.CTkLabel(
             code_header_content,
-            text="\U0001f4dd " + TRANSLATIONS[self.lang]["code_full"],
+            text="\U0001f4dd " + self.language_manager.current["code_full"],
             font=("Segoe UI", 14, "bold"),
             text_color=T["TEXT_WHITE"]
         )
@@ -114,7 +113,7 @@ class CodeViewMixin:
 
         self.expl_title_label = ctk.CTkLabel(
             expl_header_content,
-            text="\U0001f4d6 " + TRANSLATIONS[self.lang]["explanation"],
+            text="\U0001f4d6 " + self.language_manager.current["explanation"],
             font=("Segoe UI", 14, "bold"),
             text_color=T["TEXT_WHITE"]
         )

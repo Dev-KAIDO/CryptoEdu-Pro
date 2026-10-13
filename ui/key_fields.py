@@ -3,7 +3,6 @@
 import customtkinter as ctk
 
 from core.registry import get_algorithm
-from ui.translations import TRANSLATIONS
 
 
 class KeyFieldsMixin:
@@ -14,7 +13,7 @@ class KeyFieldsMixin:
         for widget in self.key_frame.winfo_children():
             widget.destroy()
 
-        t = TRANSLATIONS[self.lang]
+        t = self.language_manager.current
         entry_style = {
             "font": ("Segoe UI", 14),
             "fg_color": T["BG_INPUT"],
@@ -40,7 +39,7 @@ class KeyFieldsMixin:
             setattr(self, f"key{index}", entry)
             if field.note:
                 note = field.note
-                if note.startswith("(") and self.lang == "AR":
+                if note.startswith("(") and self.language_manager.is_rtl:
                     note = self._fb(note)
                 ctk.CTkLabel(
                     self.key_frame,

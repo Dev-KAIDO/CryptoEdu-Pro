@@ -99,7 +99,7 @@ class AnalysisViewMixin:
     def _open_analysis_page(self):
         if not getattr(self, "_analysis_ready", False):
             self.status_bar.set_status(
-                "\u26a0\ufe0f " + ("\u0642\u0645 \u0628\u0639\u0645\u0644\u064a\u0629 \u062a\u0634\u0641\u064a\u0631 \u0623\u0648\u0644\u0627\u064b!" if self.lang == "AR" else "Run an encryption operation first!"),
+                "\u26a0\ufe0f " + ("\u0642\u0645 \u0628\u0639\u0645\u0644\u064a\u0629 \u062a\u0634\u0641\u064a\u0631 \u0623\u0648\u0644\u0627\u064b!" if self.language_manager.is_rtl else "Run an encryption operation first!"),
                 "#f59e0b"
             )
             return
