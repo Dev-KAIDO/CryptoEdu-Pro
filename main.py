@@ -11,7 +11,6 @@ from core.algorithms import CryptoCore
 from core.app_state import AppState
 from core.controller import CryptoController
 from core.registry import get_algorithm, key_defaults
-from core.service import CryptoOperationService
 from ui.analysis_view import AnalysisViewMixin
 from ui.key_fields import KeyFieldsMixin
 from ui.code_view import CodeViewMixin
@@ -382,51 +381,6 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
 
 
 
-    # ---------- Caesar wheel (graphic) ----------
-
-
-
-
-    # ---------- Vigenere strip (graphic) ----------
-
-    # ---------- Playfair rectangle (graphic) ----------
-
-    # ---------- Diffie-Hellman flow (graphic) ----------
-
-    # ---------- RSA padlock (graphic) ----------
-
-    # ---------- Affine mapping ring (graphic, method 2) ----------
-
-    # ---------- Hill 2x2 matrix x vector (graphic, method 2) ----------
-
-    # ---------- RSA power chain (graphic, method 2) ----------
-
-    # ---------- Caesar ----------
-
-    # ---------- Affine ----------
-
-    # ---------- Vigenere ----------
-
-    # ---------- Playfair ----------
-
-
-    # ---------- Hill ----------
-
-    # ---------- DiffieHellman ----------
-
-    # ---------- RSA ----------
-
-
-
-
-
-
-
-
-
-
-
-
     def setup_status_bar(self):
         self.status_bar = StatusBar(self)
         self.status_bar.grid(row=1, column=0, columnspan=2, sticky="ew")
@@ -471,7 +425,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self._cancel_deferred_analysis()
         if getattr(self, "_analysis_build_after", None):
             try: self.after_cancel(self._analysis_build_after)
-            except: pass
+            except Exception: pass
             self._analysis_build_after = None
         # أغلق صفحة التحليل إن كانت مفتوحة وأزل أي محتوى قديم ونظّف صفحة التحليل بعنصر نائب خفيف
         try:
@@ -588,12 +542,13 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
                 result.job_id,
                 result.cipher,
                 result.text,
+                result.keys,
                 result.operation,
                 result.future,
             )
         self.after(50, self._poll_crypto_results)
 
-    def _finish_crypto_operation(self, job_id, cipher, text, operation, future):
+    def _finish_crypto_operation(self, job_id, cipher, text, keys, operation, future):
         """يعيد نتيجة Worker إلى Tkinter فقط إذا كانت ما زالت أحدث عملية."""
         if not self.controller.is_current(job_id):
             return
@@ -609,7 +564,7 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             if hasattr(self, "ops_label"):
                 self.ops_label.configure(text=f"{self.operations_count} {translations['operations']}")
             self._add_to_history(cipher, text, result, operation)
-            self._schedule_analysis(text, result, operation)
+            self._schedule_analysis(text, result, operation, keys)
         except Exception as error:
             self.output_box.delete("1.0", "end")
             self.output_box.insert("1.0", f"❌ {fix_bidi(str(error))}")
@@ -621,18 +576,6 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             button = getattr(self, button_name, None)
             if button is not None:
                 button.configure(state=state)
-
-    def _dispatch_crypto(self, text, method_suffix):
-        """يمرر قيم الواجهة إلى خدمة التشفير المستقلة."""
-        key_fields = [getattr(self, f"key{index}", None) for index in range(1, 5)]
-        keys = [field.get() if field is not None else "" for field in key_fields]
-        return CryptoOperationService.execute(
-            cipher=self.current_cipher,
-            text=text,
-            keys=keys,
-            operation=method_suffix,
-            lang=self.lang,
-        )
 
     def run_encrypt(self):
         self._run_crypto_operation("encrypt")

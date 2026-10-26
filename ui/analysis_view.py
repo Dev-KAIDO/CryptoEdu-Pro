@@ -133,17 +133,57 @@ class AnalysisViewMixin:
         dn = getattr(self, "_analysis_defer_after", None)
         if dn:
             try: self.after_cancel(dn)
-            except: pass
+            except Exception: pass
             self._analysis_defer_after = None
 
-    def _schedule_analysis(self, text, result, operation):
+    def _analysis_key_raw(self, index):
+        """القيمة الخام للمفتاح كما وردت في آخر عملية ناجحة (لا قراءة حية من الحقل).
+
+        تمنع تعديلات المفاتيح اللاحقة من تعطيل التحليل أو تشويه محتواه.
+        """
+        snapshot = getattr(self, "_analysis_keys_snapshot", ())
+        if snapshot and 1 <= index <= len(snapshot):
+            return snapshot[index - 1]
+        field = getattr(self, f"key{index}", None)
+        return field.get() if field is not None else ""
+
+    def _schedule_analysis(self, text, result, operation, keys=None):
         self._cancel_deferred_analysis()
         # التحليل يبني عناصر Tkinter كثيرة؛ النتيجة الكاملة تبقى محفوظة،
         # بينما نحلل جزءًا محدودًا فقط للحفاظ على سرعة الواجهة.
         analysis_text = text[:100]
         analysis_result = result[:100]
+        # تثبيت قيم المفاتيح الحقيقية المستخدمة في العملية الناجحة حتى لا يفسد
+        # تعديل الحقول لاحقًا التحليل البصري أو يولد قيم int غير صالحة.
+        if keys is None:
+            keys = self.get_key_values()
+        self._analysis_keys_snapshot = tuple(str(key) for key in keys)
         self._analysis_defer_after = self.after(
             30, lambda t=analysis_text, r=analysis_result, op=operation: self._update_analysis(t, r, op)
+        )
+
+    def _analysis_unavailable(self, cipher, error):
+        """بطاقة خطأ ودية تمنع انهيار صفحة التحليل على قيم غير قابلة للتحليل."""
+        self._analysis_hero(
+            self._L("التحليل البصري غير متاح الآن", "Visual analysis unavailable"),
+            self._L(
+                f"يستخدم التحليل مفاتيح آخر عملية ناجحة، وقيمته أقل كانت غير قابلة للتحليل ({error.__class__.__name__}).",
+                f"The analysis uses the keys from the last successful run, and one of them is not analyzable ({error.__class__.__name__})."
+            ),
+            "#ef4444",
+            "\u26a0\ufe0f"
+        )
+        self._analysis_note(
+            self._L(
+                "صوب المفاتيح ونفّذ العملية من جديد ليعود التحليل البصري إلى الصفحة.",
+                "Fix the keys and run the operation again to restore the visual analysis."
+            ),
+            "#f59e0b",
+            "\U0001f501"
+        )
+        self.status_bar.set_status(
+            "\u26a0\ufe0f " + self._L("المفاتيح الحالية غير قابلة للتحليل", "Current keys cannot be analyzed"),
+            "#f59e0b"
         )
 
     def _update_analysis(self, input_text, output_text, operation):
@@ -151,7 +191,7 @@ class AnalysisViewMixin:
         self._cancel_deferred_analysis()
         if getattr(self, "_analysis_build_after", None):
             try: self.after_cancel(self._analysis_build_after)
-            except: pass
+            except Exception: pass
             self._analysis_build_after = None
         for w in self.analysis_content.winfo_children():
             w.destroy()
@@ -159,26 +199,30 @@ class AnalysisViewMixin:
         cipher = self.current_cipher
         T = self._T
 
-        if cipher == "Caesar":
-            self._analyze_caesar(input_text, operation)
-        elif cipher == "Affine":
-            self._analyze_affine(input_text, operation)
-        elif cipher == "Vigenere":
-            self._analyze_vigenere(input_text, operation)
-        elif cipher == "Playfair":
-            self._analyze_playfair(input_text, operation)
-        elif cipher == "Hill":
-            self._analyze_hill(input_text, operation)
-        elif cipher == "DiffieHellman":
-            self._analyze_diffiehellman(input_text, output_text)
-        elif cipher == "RSA":
-            self._analyze_rsa(input_text, output_text, operation)
-        elif cipher == "SDES":
-            self._analyze_sdes(input_text, output_text, operation)
-        elif cipher == "DES":
-            self._analyze_des(input_text, output_text, operation)
-        else:
-            self._analysis_hero(self._L("\U0001f4dd العملية", "\U0001f4dd Operation"), f"{operation}: {cipher}", T["PRIMARY"], "\U0001f4dd")
+        # التحليل كاملًا داخل حماية، أي مفتاح/\u062aحول غير صالح لا يبطِل تجربة الصفحة.
+        try:
+            if cipher == "Caesar":
+                self._analyze_caesar(input_text, operation)
+            elif cipher == "Affine":
+                self._analyze_affine(input_text, operation)
+            elif cipher == "Vigenere":
+                self._analyze_vigenere(input_text, operation)
+            elif cipher == "Playfair":
+                self._analyze_playfair(input_text, operation)
+            elif cipher == "Hill":
+                self._analyze_hill(input_text, operation)
+            elif cipher == "DiffieHellman":
+                self._analyze_diffiehellman(input_text, output_text)
+            elif cipher == "RSA":
+                self._analyze_rsa(input_text, output_text, operation)
+            elif cipher == "SDES":
+                self._analyze_sdes(input_text, output_text, operation)
+            elif cipher == "DES":
+                self._analyze_des(input_text, output_text, operation)
+            else:
+                self._analysis_hero(self._L("\U0001f4dd العملية", "\U0001f4dd Operation"), f"{operation}: {cipher}", T["PRIMARY"], "\U0001f4dd")
+        except (ValueError, IndexError, ZeroDivisionError, KeyError) as error:
+            self._analysis_unavailable(cipher, error)
 
         self.analysis_page_title.configure(
             text="\U0001f50d  " + self._L("تحليل التشفير", "Encryption Analysis") + " — " + cipher
@@ -378,7 +422,7 @@ class AnalysisViewMixin:
         try:
             if not wheel_scroll.winfo_exists() or not self.analysis_content.winfo_exists():
                 return
-        except: return
+        except Exception: return
         batch = 4
         end = min(idx + batch, len(shown))
         for j in range(idx, end):
@@ -411,7 +455,7 @@ class AnalysisViewMixin:
             self._analysis_build_after = None
             if truncated:
                 try: ctk.CTkLabel(self.analysis_content, text=self._L(f"… و {len(letters)-MAX_WHEELS} حرف إضافي لم يُعرض للحفاظ على السرعة", f"... and {len(letters)-MAX_WHEELS} more characters hidden for performance"), font=("Segoe UI", 10), text_color=self._T["TEXT_MUTED"]).pack(pady=4)
-                except: pass
+                except Exception: pass
 
     def _enable_horizontal_scroll(self, scroll_frame):
         """يجعل شريط التمرير الأفقي يستجيب لعجلة الماوس والسحب داخل منطقة الدوار.
@@ -717,7 +761,7 @@ class AnalysisViewMixin:
 
     def _analyze_caesar(self, text, operation):
         T = self._T
-        key = int(self.key1.get())
+        key = int(self._analysis_key_raw(1))
         shift = key if operation == "encrypt" else -key
         self._analysis_hero(
             self._L("إزاحة قيصر  Caesar Shift", "Caesar Shift"),
@@ -829,8 +873,8 @@ class AnalysisViewMixin:
 
     def _analyze_affine(self, text, operation):
         T = self._T
-        m = int(self.key1.get())
-        k = int(self.key2.get())
+        m = int(self._analysis_key_raw(1))
+        k = int(self._analysis_key_raw(2))
         inv_m = CryptoCore.mod_inverse(m, 26)
         self._analysis_hero(
             self._L("التحويل الخطي المتآلف  Affine", "Affine Cipher"),
@@ -948,7 +992,7 @@ class AnalysisViewMixin:
 
     def _analyze_vigenere(self, text, operation):
         T = self._T
-        key = self.key1.get().upper()
+        key = self._analysis_key_raw(1).upper()
         if not key:
             key = "A"
         self._analysis_hero(
@@ -1024,7 +1068,7 @@ class AnalysisViewMixin:
                 ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side="left")
 
     def _analyze_playfair(self, text, operation):
-        key = self.key1.get()
+        key = self._analysis_key_raw(1)
         matrix = CryptoCore.playfair_matrix(key)
         self._analysis_hero(
             self._L("شبكة بلايفير 5\u00d75  Playfair", "Playfair 5\u00d75 Grid"),
@@ -1090,7 +1134,7 @@ class AnalysisViewMixin:
         ctk.CTkLabel(row_f, text=rule, font=("Segoe UI", 11, "bold"), text_color="#059669", padx=10).pack(side="left")
 
     def _analyze_hill(self, text, operation):
-        matrix = CryptoCore.hill_matrix(self.key1.get())
+        matrix = CryptoCore.hill_matrix(self._analysis_key_raw(1))
         self._analysis_hero(
             self._L("شيفرة هيل 2\u00d72  Hill", "Hill Cipher 2\u00d72"),
             self._L(
@@ -1185,7 +1229,7 @@ class AnalysisViewMixin:
     def _analyze_diffiehellman(self, input_text, output_text):
         T = self._T
         try:
-            p, g, a, b = int(self.key1.get()), int(self.key2.get()), int(self.key3.get()), int(self.key4.get())
+            p, g, a, b = int(self._analysis_key_raw(1)), int(self._analysis_key_raw(2)), int(self._analysis_key_raw(3)), int(self._analysis_key_raw(4))
         except Exception:
             return
         A = pow(g, a, p)
@@ -1264,7 +1308,7 @@ class AnalysisViewMixin:
 
     def _analyze_rsa(self, input_text, output_text, operation):
         T = self._T
-        p, q, e = int(self.key1.get()), int(self.key2.get()), int(self.key3.get())
+        p, q, e = int(self._analysis_key_raw(1)), int(self._analysis_key_raw(2)), int(self._analysis_key_raw(3))
         n = p * q
         phi = (p - 1) * (q - 1)
         d = CryptoCore.mod_inverse(e, phi)
@@ -1343,7 +1387,7 @@ class AnalysisViewMixin:
                 ctk.CTkLabel(row, text=f"{c}^{d} mod {n} = {m} \u2192 '{ch}'", font=("Cascadia Code", 11, "bold"), text_color="#6ee7b7", padx=10).pack(side="left")
 
     def _analyze_sdes(self, input_text, output_text, operation):
-        key = self.key1.get().strip().replace(' ', '')
+        key = self._analysis_key_raw(1).strip().replace(' ', '')
         pt = input_text.strip().replace(' ', '')
         try:
             K1, K2 = CryptoCore.sdes_keygen(key)
@@ -1450,7 +1494,7 @@ class AnalysisViewMixin:
             ctk.CTkLabel(row, text=expr, font=("Cascadia Code", 10, "bold"), text_color=accent).pack(side="left", padx=6, pady=2)
 
     def _analyze_sdes_keys(self):
-        key = self.key1.get().strip().replace(' ', '')
+        key = self._analysis_key_raw(1).strip().replace(' ', '')
         try:
             K1, K2 = CryptoCore.sdes_keygen(key)
         except Exception:
@@ -1466,7 +1510,7 @@ class AnalysisViewMixin:
         return ','.join(str(x) for x in perm)
 
     def _analyze_des(self, input_text, output_text, operation):
-        key = self.key1.get().strip().replace(' ', '')
+        key = self._analysis_key_raw(1).strip().replace(' ', '')
         pt = input_text.strip().replace(' ', '')
         try:
             keys = CryptoCore.des_keygen(key)

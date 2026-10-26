@@ -17,6 +17,7 @@ class CryptoResult:
     job_id: int
     cipher: str
     text: str
+    keys: tuple[str, ...]
     operation: str
     future: Future
 
@@ -38,13 +39,13 @@ class CryptoController:
         self.state.crypto_job_id += 1
         job_id = self.state.crypto_job_id
         future = self.executor.submit(self.service.execute, cipher, text, keys, operation, lang)
-        future.add_done_callback(self._enqueue_result(job_id, cipher, text, operation))
+        future.add_done_callback(self._enqueue_result(job_id, cipher, text, keys, operation))
         return job_id
 
-    def _enqueue_result(self, job_id, cipher, text, operation):
+    def _enqueue_result(self, job_id, cipher, text, keys, operation):
         def callback(future):
             if not self.state.closing:
-                self._results.put(CryptoResult(job_id, cipher, text, operation, future))
+                self._results.put(CryptoResult(job_id, cipher, text, keys, operation, future))
 
         return callback
 
