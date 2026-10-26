@@ -1,4 +1,5 @@
 # main.py
+# pyrefly: ignore[missing-import]
 import customtkinter as ctk
 import sys
 import os
