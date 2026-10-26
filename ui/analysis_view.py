@@ -12,6 +12,7 @@ import customtkinter as ctk
 
 from core.algorithms import CryptoCore
 from core.textutils import fix_bidi
+from core.alphabet import ARABIC_ALPHABET, ARABIC_INDEX, LATIN_ALPHABET, LATIN_INDEX, is_arabic_text, normalize_arabic
 
 
 class AnalysisViewMixin:
@@ -283,6 +284,12 @@ class AnalysisViewMixin:
             ).pack(side="right", padx=12, pady=8)
         return card
 
+    @staticmethod
+    def _alphabet_pack(text):
+        """يحدد الأبجدية من نص اللقطة: 28 حرفًا عربيًا أو 26 لاتينيًا."""
+        if is_arabic_text(text):
+            return ARABIC_ALPHABET, ARABIC_INDEX, 28, "mod 28"
+        return LATIN_ALPHABET, LATIN_INDEX, 26, "mod 26"
     def _analysis_tile(self, parent, text, color, sub=None, size=20, width=48, height=50):
         T = self._T
         tile = ctk.CTkFrame(parent, fg_color=color, corner_radius=8, width=width, height=height)
@@ -341,7 +348,7 @@ class AnalysisViewMixin:
         note.pack(fill="x", padx=6, pady=4)
         ctk.CTkLabel(note, text=f"{icon}  {text}", font=("Segoe UI", 12), text_color=color, anchor="w", wraplength=1600, justify="left").pack(fill="x", padx=12, pady=8)
 
-    def _caesar_wheel(self, plain_idx, res_idx, shift, color="#7c3aed", parent=None, compact=False, caption=None):
+    def _caesar_wheel(self, plain_idx, res_idx, shift, color="#7c3aed", parent=None, compact=False, caption=None, alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", modulus=26, mod_label="mod 26"):
         parent = parent if parent is not None else self.analysis_content
         in_scroll = parent is not self.analysis_content or compact
         T = self._T
@@ -353,7 +360,7 @@ class AnalysisViewMixin:
             cx, cy = 140, 112
             sc = 0.88  # scale factor vs the 360px original (enlarged for clarity)
             R, Rb, hub = int(132 * sc), int(100 * sc), int(48 * sc)
-            step = 360 / 26
+            step = 360 / modulus
             def pos(i, r):
                 a = math.radians(90 - i * step)
                 return cx + r * math.cos(a), cy - r * math.sin(a)
@@ -363,24 +370,24 @@ class AnalysisViewMixin:
             canvas.create_arc(cx - R + int(12 * sc), cy - R + int(12 * sc), cx + R - int(12 * sc), cy + R - int(12 * sc), start=210, extent=70, style="arc", outline="#40305f", width=max(2, int(6 * sc)))
             canvas.create_arc(cx - R + int(12 * sc), cy - R + int(12 * sc), cx + R - int(12 * sc), cy + R - int(12 * sc), start=30, extent=70, style="arc", outline="#241a3a", width=max(2, int(6 * sc)))
             canvas.create_oval(cx - Rb, cy - Rb, cx + Rb, cy + Rb, outline=color, width=2)
-            for i in range(26):
+            for i in range(modulus):
                 x, y = pos(i, Rb + int(13 * sc))
                 x2, y2 = pos(i, Rb - int(13 * sc))
                 canvas.create_line(x, y, x2, y2, fill="#2a2140", width=1)
                 lx, ly = pos(i, Rb - int(32 * sc))
-                canvas.create_text(lx, ly, text=chr(65 + i), font=("Segoe UI", 9, "bold"), fill="#8b84a8")
+                canvas.create_text(lx, ly, text=alphabet[i], font=("Segoe UI", 9, "bold"), fill="#8b84a8")
             px, py = pos(plain_idx, Rb + int(17 * sc))
             rx, ry = pos(res_idx, Rb + int(17 * sc))
             canvas.create_oval(px - 8, py - 8, px + 8, py + 8, fill=color, outline="#ffffff", width=1)
-            canvas.create_text(px, py, text=chr(65 + plain_idx), font=("Segoe UI", 9, "bold"), fill="#ffffff")
+            canvas.create_text(px, py, text=alphabet[plain_idx], font=("Segoe UI", 9, "bold"), fill="#ffffff")
             canvas.create_oval(rx - 9, ry - 9, rx + 9, ry + 9, fill="#34d399", outline="#ffffff", width=1)
-            canvas.create_text(rx, ry, text=chr(65 + res_idx), font=("Segoe UI", 9, "bold"), fill="#06251a")
+            canvas.create_text(rx, ry, text=alphabet[res_idx], font=("Segoe UI", 9, "bold"), fill="#06251a")
             # subtle arrow — scaled
             canvas.create_line(px - 4, py - 4, rx + 5, ry + 4, arrow="last", width=2, fill="#f472b6", smooth=True)
             canvas.create_oval(cx - hub, cy - hub, cx + hub, cy + hub, fill="#241a3a", outline=color, width=2)
-            canvas.create_text(cx, cy - 9, text=f"{chr(65 + plain_idx)}{shift:+}", font=("Cascadia Code", 8, "bold"), fill="#a78bfa")
-            canvas.create_text(cx, cy + 8, text=chr(65 + res_idx), font=("Segoe UI", 16, "bold"), fill="#ffffff")
-            canvas.create_text(cx, cy + 22, text="mod 26", font=("Segoe UI", 8, "bold"), fill="#8b84a8")
+            canvas.create_text(cx, cy - 9, text=f"{alphabet[plain_idx]}{shift:+}", font=("Cascadia Code", 8, "bold"), fill="#a78bfa")
+            canvas.create_text(cx, cy + 8, text=alphabet[res_idx], font=("Segoe UI", 16, "bold"), fill="#ffffff")
+            canvas.create_text(cx, cy + 22, text=mod_label, font=("Segoe UI", 8, "bold"), fill="#8b84a8")
             # caption drawn directly (saves a heavy CTkLabel per wheel)
             if caption:
                 canvas.create_text(cx, H - 18, text=caption, font=("Segoe UI", 10, "bold"), fill=T["TEXT_LIGHT"])
@@ -389,7 +396,7 @@ class AnalysisViewMixin:
         canvas = ctk.CTkCanvas(parent, width=360, height=320, bg=T["BG_INPUT"], highlightthickness=0, bd=0)
         canvas.pack(side="left", padx=8, pady=6) if in_scroll else canvas.pack(fill="x", padx=6, pady=4)
         cx, cy, R, Rb, hub = 180, 152, 130, 98, 46
-        step = 360 / 26
+        step = 360 / modulus
         def pos(i, r):
             a = math.radians(90 - i * step)
             return cx + r * math.cos(a), cy - r * math.sin(a)
@@ -398,31 +405,32 @@ class AnalysisViewMixin:
         canvas.create_arc(cx - R + 12, cy - R + 12, cx + R - 12, cy + R - 12, start=210, extent=70, style="arc", outline="#40305f", width=6)
         canvas.create_arc(cx - R + 12, cy - R + 12, cx + R - 12, cy + R - 12, start=30, extent=70, style="arc", outline="#241a3a", width=6)
         canvas.create_oval(cx - Rb, cy - Rb, cx + Rb, cy + Rb, outline=color, width=3)
-        for i in range(26):
+        for i in range(modulus):
             x, y = pos(i, Rb + 12)
             x2, y2 = pos(i, Rb - 12)
             canvas.create_line(x, y, x2, y2, fill="#2a2140", width=2)
             lx, ly = pos(i, Rb - 30)
-            canvas.create_text(lx, ly, text=chr(65 + i), font=("Segoe UI", 10, "bold"), fill="#8b84a8")
+            canvas.create_text(lx, ly, text=alphabet[i], font=("Segoe UI", 10, "bold"), fill="#8b84a8")
         px, py = pos(plain_idx, Rb + 16)
         rx, ry = pos(res_idx, Rb + 16)
         canvas.create_oval(px - 11, py - 11, px + 11, py + 11, fill=color, outline="#ffffff", width=2)
-        canvas.create_text(px, py, text=chr(65 + plain_idx), font=("Segoe UI", 11, "bold"), fill="#ffffff")
+        canvas.create_text(px, py, text=alphabet[plain_idx], font=("Segoe UI", 11, "bold"), fill="#ffffff")
         canvas.create_oval(rx - 13, ry - 13, rx + 13, ry + 13, fill="#34d399", outline="#ffffff", width=2)
-        canvas.create_text(rx, ry, text=chr(65 + res_idx), font=("Segoe UI", 12, "bold"), fill="#06251a")
+        canvas.create_text(rx, ry, text=alphabet[res_idx], font=("Segoe UI", 12, "bold"), fill="#06251a")
         canvas.create_line(px - 8, py - 8, rx + 10, ry + 8, arrow="last", width=4, fill="#f472b6", smooth=True, joinstyle="round")
         canvas.create_oval(cx - hub, cy - hub, cx + hub, cy + hub, fill="#241a3a", outline=color, width=3)
-        canvas.create_text(cx, cy - 16, text=f"{chr(65 + plain_idx)} {shift:+}", font=("Cascadia Code", 12, "bold"), fill="#a78bfa")
-        canvas.create_text(cx, cy + 6, text=chr(65 + res_idx), font=("Segoe UI", 30, "bold"), fill="#ffffff")
-        canvas.create_text(cx, cy + 26, text="mod 26", font=("Segoe UI", 8, "bold"), fill="#8b84a8")
+        canvas.create_text(cx, cy - 16, text=f"{alphabet[plain_idx]} {shift:+}", font=("Cascadia Code", 12, "bold"), fill="#a78bfa")
+        canvas.create_text(cx, cy + 6, text=alphabet[res_idx], font=("Segoe UI", 30, "bold"), fill="#ffffff")
+        canvas.create_text(cx, cy + 26, text=mod_label, font=("Segoe UI", 8, "bold"), fill="#8b84a8")
         return canvas
 
-    def _build_caesar_wheels_batch(self, shown, shift, wheel_scroll, idx, truncated, letters, MAX_WHEELS):
+    def _build_caesar_wheels_batch(self, shown, shift, wheel_scroll, idx, truncated, letters, MAX_WHEELS, alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", modulus=26):
         # guard: if analysis was cleared (cipher changed) abort gracefully
         try:
             if not wheel_scroll.winfo_exists() or not self.analysis_content.winfo_exists():
                 return
         except Exception: return
+        index_map = {ch: i for i, ch in enumerate(alphabet)}
         batch = 4
         end = min(idx + batch, len(shown))
         for j in range(idx, end):
@@ -430,12 +438,12 @@ class AnalysisViewMixin:
                 ch = shown[j]
                 card = ctk.CTkFrame(wheel_scroll, fg_color="transparent", width=292)
                 card.pack(side="left", padx=4, pady=4)
-                if ch.isalpha():
-                    p = ord(ch) - 65
-                    c = (p + shift) % 26
-                    self._caesar_wheel(p, c, shift, "#7c3aed", parent=card, compact=True, caption=self._L(f"الحرف {j + 1}: «{ch}»", f"Letter {j + 1}: «{ch}»"))
+                p = index_map.get(ch)
+                if p is not None:
+                    c = (p + shift) % modulus
+                    self._caesar_wheel(p, c, shift, "#7c3aed", parent=card, compact=True, caption=self._L(f"الحرف {j + 1}: «{ch}»", f"Letter {j + 1}: «{ch}»"), alphabet=alphabet, modulus=modulus)
                 else:
-                    self._caesar_wheel(0, 0, 0, "#64748b", parent=card, compact=True, caption=self._L(f"الحرف {j + 1}: غير أبجدي", f"Letter {j + 1}: non-alpha"))
+                    self._caesar_wheel(0, 0, 0, "#64748b", parent=card, compact=True, caption=self._L(f"الحرف {j + 1}: غير أبجدي", f"Letter {j + 1}: non-alpha"), alphabet=alphabet, modulus=modulus)
                 # ربط محلي (غير عام) للعجلة على البطاقة وكل أبنائها — حتى تمر أي عجلة
                 # يدور الشريط أفقياً دون الحاجة إلى bind_all (وهو سبب الثقل السابق).
                 try:
@@ -449,7 +457,7 @@ class AnalysisViewMixin:
             except Exception:
                 continue
         if end < len(shown):
-            self._analysis_build_after = self.after(14, lambda: self._build_caesar_wheels_batch(shown, shift, wheel_scroll, end, truncated, letters, MAX_WHEELS))
+            self._analysis_build_after = self.after(14, lambda: self._build_caesar_wheels_batch(shown, shift, wheel_scroll, end, truncated, letters, MAX_WHEELS, alphabet, modulus))
         else:
             # اكتمل البناء — لا تركة/موقتات معلّقة
             self._analysis_build_after = None
@@ -527,8 +535,9 @@ class AnalysisViewMixin:
             yield node
             stack.extend(node.winfo_children())
 
-    def _vigenere_strip(self, key_char, plain_idx, color="#f59e0b"):
-        k = ord(key_char) - 65
+    def _vigenere_strip(self, key_char, plain_idx, color="#f59e0b", alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", modulus=26):
+        letter_pos = {ch: i for i, ch in enumerate(alphabet)}
+        k = letter_pos.get(key_char, 0)
         W, H = 700, 180
         canvas = self._analysis_canvas(W, H)
         cell = 14.0
@@ -536,11 +545,11 @@ class AnalysisViewMixin:
         start_x = 55
         top_y = 42
         bottom_y = 115
-        shifted = lambda ci: chr(((ci + k) % 26) + 65)
+        shifted = lambda ci: alphabet[(ci + k) % modulus]
         step = cell + gap
 
         canvas.create_text(8, top_y + cell / 2, text=self._L("الأصلي:", "Plain:"), font=("Segoe UI", 10, "bold"), fill=self._T["TEXT_GRAY"], anchor="w")
-        for i in range(26):
+        for i in range(modulus):
             x = start_x + i * step
             txt_top = self._T["TEXT_LIGHT"]
             if i == plain_idx:
@@ -548,14 +557,14 @@ class AnalysisViewMixin:
                 txt_top = "#ffffff"
             else:
                 canvas.create_rectangle(x, top_y, x + cell, top_y + cell, fill="#241a3a", outline="#2f2745")
-            canvas.create_text(x + cell / 2, top_y + cell / 2, text=chr(65 + i), font=("Segoe UI", 9, "bold"), fill=txt_top)
+            canvas.create_text(x + cell / 2, top_y + cell / 2, text=alphabet[i], font=("Segoe UI", 9, "bold"), fill=txt_top)
 
         mid_x = start_x + plain_idx * step + cell / 2
         canvas.create_text(mid_x, top_y + cell + 14, text=f"{self._L('الإزاحة:', 'Shift:')} +{k}", font=("Segoe UI", 11, "bold"), fill=color, anchor="center")
         canvas.create_line(mid_x, top_y + cell + 4, mid_x, bottom_y - 4, arrow="last", width=3, fill=color, dash=(5, 3))
 
         canvas.create_text(8, bottom_y + cell / 2, text=self._L("المشفر:", "Cipher:"), font=("Segoe UI", 10, "bold"), fill=self._T["TEXT_GRAY"], anchor="w")
-        for i in range(26):
+        for i in range(modulus):
             x = start_x + i * step
             if i == plain_idx:
                 canvas.create_rectangle(x - 2, bottom_y - 3, x + cell + 2, bottom_y + cell + 3, fill="#34d399", outline="#ffffff", width=2)
@@ -565,13 +574,13 @@ class AnalysisViewMixin:
                 tcol = "#6ee7b7"
             canvas.create_text(x + cell / 2, bottom_y + cell / 2, text=shifted(i), font=("Segoe UI", 9, "bold"), fill=tcol)
 
-        info_x = int(start_x + 26 * step + 20)
+        info_x = int(start_x + modulus * step + 20)
         box_right = W - 10
         canvas.create_rectangle(info_x, 30, box_right, H - 30, fill="#0f172a", outline="#334155", width=2)
 
         s1 = 44
         canvas.create_text(info_x + 12, s1, text=self._L("الحرف الأصلي:", "Plain letter:"), font=("Segoe UI", 9, "bold"), fill="#94a3b8", anchor="nw")
-        canvas.create_text(info_x + 12, s1 + 16, text=chr(65 + plain_idx), font=("Segoe UI", 20, "bold"), fill="#ffffff", anchor="nw")
+        canvas.create_text(info_x + 12, s1 + 16, text=alphabet[plain_idx], font=("Segoe UI", 20, "bold"), fill="#ffffff", anchor="nw")
         canvas.create_text(info_x + 40, s1 + 19, text=f"= {plain_idx}", font=("Segoe UI", 10), fill="#64748b", anchor="nw")
 
         s2 = s1 + 46
@@ -582,23 +591,24 @@ class AnalysisViewMixin:
         s3 = s2 + 46
         canvas.create_text(info_x + 12, s3, text=self._L("الناتج:", "Result:"), font=("Segoe UI", 9, "bold"), fill="#94a3b8", anchor="nw")
         canvas.create_text(info_x + 12, s3 + 16, text=shifted(plain_idx), font=("Segoe UI", 16, "bold"), fill="#34d399", anchor="nw")
-
     def _playfair_rect_canvas(self, matrix, a, b, op, color="#10b981"):
         def find(letter):
-            for r in range(5):
-                for c in range(5):
+            for r in range(len(matrix)):
+                for c in range(len(matrix[0])):
                     if matrix[r][c] == letter:
                         return r, c
             return 0, 0
         r1, c1 = find(a)
         r2, c2 = find(b)
         cell, gap, ox, oy = 34, 3, 12, 12
-        size = 5 * (cell + gap)
-        canvas = self._analysis_canvas(size + 24 + 120, size + 24)
+        rows, cols = len(matrix), len(matrix[0])
+        size = rows * (cell + gap)
+        size_x = cols * (cell + gap)
+        canvas = self._analysis_canvas(size_x + 24 + 120, size + 24)
         def xy(r, c):
             return ox + c * (cell + gap), oy + r * (cell + gap)
-        for r in range(5):
-            for c in range(5):
+        for r in range(rows):
+            for c in range(cols):
                 x, y = xy(r, c)
                 fill, tcol = "#241a3a", self._T["TEXT_LIGHT"]
                 if (r, c) in [(r1, c1), (r2, c2)]:
@@ -627,8 +637,7 @@ class AnalysisViewMixin:
             px1, py1 = x1 + cell / 2, y1 + cell / 2
             canvas.create_line(px1, py1, x2 + cell / 2, y1 + cell / 2, arrow="last", width=3, fill=color)
             rule = self._L("\u25a0 مستطيل: بدّل الأعمدة", "\u25a0 Rectangle: swap columns")
-        canvas.create_text(size + 24 + 60 + 12, size / 2, text=rule, font=("Segoe UI", 11, "bold"), fill=color, anchor="w")
-
+        canvas.create_text(size_x + 24 + 60 + 12, size / 2, text=rule, font=("Segoe UI", 11, "bold"), fill=color, anchor="w")
     def _dh_flow_canvas(self, p, g, a, b, A, B, s_alice, s_bob):
         canvas = self._analysis_canvas(380, 200)
         canvas.create_oval(38, 34, 138, 134, fill="#701a75", outline="#c026d3", width=3)
@@ -659,55 +668,54 @@ class AnalysisViewMixin:
         canvas.create_text(286, 42, text=str(c), font=("Cascadia Code", 19, "bold"), fill="#34d399", anchor="w")
         canvas.create_text(286, 74, text="c = m\u1d40 mod n", font=("Cascadia Code", 9, "bold"), fill="#6ee7b7", anchor="w")
 
-    def _affine_ring_canvas(self, m, k, plain_idx, res_idx, color="#06b6d4", parent=None):
+    def _affine_ring_canvas(self, m, k, plain_idx, res_idx, color="#06b6d4", parent=None, alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", modulus=26, mod_label="mod 26"):
         T = self._T
         parent = parent if parent is not None else self.analysis_content
         W, H = 500, 400
         canvas = ctk.CTkCanvas(parent, width=W, height=H, bg=T["BG_INPUT"], highlightthickness=0, bd=0)
         canvas.pack(side="left", padx=10, pady=10)
         cx, cy = 155, 200
-        R, inn, step = 125, 84, 360 / 26
+        R, inn, step = 125, 84, 360 / modulus
         def pos(i, r):
             a = math.radians(90 - i * step)
             return cx + r * math.cos(a), cy - r * math.sin(a)
         canvas.create_oval(cx - R, cy - R, cx + R, cy + R, fill="#0b2d3a", outline="#22d3ee", width=3)
         canvas.create_oval(cx - inn, cy - inn, cx + inn, cy + inn, fill="#06212b", outline="#0e7490", width=2)
-        for i in range(26):
+        for i in range(modulus):
             ox, oy = pos(i, inn)
             ix, iy = pos(i, R)
             canvas.create_line(ox, oy, ix, iy, fill="#1e4c5e", width=1)
-        for i in range(26):
+        for i in range(modulus):
             x, y = pos(i, R + 18)
             if i == plain_idx:
                 canvas.create_oval(x - 14, y - 14, x + 14, y + 14, fill=color, outline="#ffffff", width=2)
-                canvas.create_text(x, y, text=chr(65 + i), font=("Segoe UI", 12, "bold"), fill="#0b2d3a")
+                canvas.create_text(x, y, text=alphabet[i], font=("Segoe UI", 12, "bold"), fill="#0b2d3a")
             else:
                 canvas.create_oval(x - 12, y - 12, x + 12, y + 12, fill="#d1d5db", outline="#ffffff", width=1)
-                canvas.create_text(x, y, text=chr(65 + i), font=("Segoe UI", 10, "bold"), fill="#1e293b")
-        for i in range(26):
-            res = (m * i + k) % 26
+                canvas.create_text(x, y, text=alphabet[i], font=("Segoe UI", 10, "bold"), fill="#1e293b")
+        for i in range(modulus):
+            res = (m * i + k) % modulus
             x, y = pos(res, inn)
             if i == plain_idx:
                 canvas.create_oval(x - 9, y - 9, x + 9, y + 9, fill="#22d3ee", outline="#ffffff", width=2)
-                canvas.create_text(x, y, text=chr(65 + res), font=("Segoe UI", 10, "bold"), fill="#06212b")
+                canvas.create_text(x, y, text=alphabet[res], font=("Segoe UI", 10, "bold"), fill="#06212b")
             else:
-                canvas.create_text(x, y, text=chr(65 + res), font=("Segoe UI", 10, "bold"), fill="#67e8f9")
+                canvas.create_text(x, y, text=alphabet[res], font=("Segoe UI", 10, "bold"), fill="#67e8f9")
         xp, yp = pos(plain_idx, R + 18)
         xs, ys = pos(res_idx, inn)
         canvas.create_line(xp, yp, xs, ys, arrow="last", width=3, fill=color, dash=(5, 3))
         px = 310
         canvas.create_rectangle(px, 30, W - 14, 370, fill="#08272e", outline="#155e75", width=2)
         canvas.create_text(px + 10, 58, text=self._L("الحرف الأصلي", "Plain letter"), font=("Segoe UI", 11, "bold"), fill=T["TEXT_GRAY"], anchor="nw")
-        canvas.create_text(px + 10, 86, text=chr(65 + plain_idx), font=("Segoe UI", 32, "bold"), fill="#ffffff", anchor="nw")
+        canvas.create_text(px + 10, 86, text=alphabet[plain_idx], font=("Segoe UI", 32, "bold"), fill="#ffffff", anchor="nw")
         canvas.create_text(px + 10, 132, text=self._L("x =", "x =") + f" {plain_idx}", font=("Cascadia Code", 12, "bold"), fill="#22d3ee", anchor="nw")
         canvas.create_text(px + 10, 160, text=self._L("القيمة العددية", "Value"), font=("Segoe UI", 10, "bold"), fill=T["TEXT_GRAY"], anchor="nw")
-        canvas.create_text(px + 10, 184, text=f"({m}\u00b7{plain_idx} + {k})", font=("Cascadia Code", 11, "bold"), fill="#a5f3fc", anchor="nw")
-        canvas.create_text(px + 10, 208, text=f"mod 26 = {res_idx}", font=("Cascadia Code", 11, "bold"), fill="#a5f3fc", anchor="nw")
+        canvas.create_text(px + 10, 184, text=f"({m}·{plain_idx} + {k})", font=("Cascadia Code", 11, "bold"), fill="#a5f3fc", anchor="nw")
+        canvas.create_text(px + 10, 208, text=f"{mod_label} = {res_idx}", font=("Cascadia Code", 11, "bold"), fill="#a5f3fc", anchor="nw")
         canvas.create_text(px + 10, 238, text=self._L("الناتج", "Result"), font=("Segoe UI", 10, "bold"), fill=T["TEXT_GRAY"], anchor="nw")
-        canvas.create_text(px + 10, 268, text=chr(65 + res_idx), font=("Segoe UI", 30, "bold"), fill="#67e8f9", anchor="nw")
+        canvas.create_text(px + 10, 268, text=alphabet[res_idx], font=("Segoe UI", 30, "bold"), fill="#67e8f9", anchor="nw")
         canvas.create_text(px + 10, 306, text=f"= {res_idx}", font=("Cascadia Code", 12, "bold"), fill="#34d399", anchor="nw")
-
-    def _hill_vector_canvas(self, matrix, p1, p2, c1, c2, op, color="#ec4899"):
+    def _hill_vector_canvas(self, matrix, p1, p2, c1, c2, op, color="#ec4899", modulus=26, mod_label="mod 26"):
         T = self._T
         canvas = self._analysis_canvas(340, 128)
         ox = 12
@@ -722,7 +730,7 @@ class AnalysisViewMixin:
         canvas.create_text(ox + 13, 14, text="K", font=("Segoe UI", 9, "bold"), fill=T["TEXT_GRAY"])
         xm = ox + 60 + 30 - 10
         # multiply x
-        canvas.create_text(xm, 30, text="\u00d7", font=("Segoe UI", 18, "bold"), fill="#f472b6")
+        canvas.create_text(xm, 30, text="×", font=("Segoe UI", 18, "bold"), fill="#f472b6")
         # plain vector P = [p1, p2]
         for i, v in enumerate([p1, p2]):
             x, y = xm + 20, 26 + i * 30
@@ -738,14 +746,13 @@ class AnalysisViewMixin:
             canvas.create_text(x + 13, y + 13, text=str(v), font=("Cascadia Code", 12, "bold"), fill="#ffffff")
         canvas.create_text(xm + 93, 14, text="C", font=("Segoe UI", 9, "bold"), fill=T["TEXT_GRAY"])
         if op == "encrypt":
-            title_label = self._L("K \u00d7 P = C  (mod 26)", "K \u00d7 P = C  (mod 26)")
-            row_note = f"({matrix[0][0]}\u00b7{p1} + {matrix[0][1]}\u00b7{p2}) mod 26 = {c1}"
+            title_label = self._L(f"K × P = C  ({mod_label})", f"K × P = C  ({mod_label})")
+            row_note = f"({matrix[0][0]}·{p1} + {matrix[0][1]}·{p2}) {mod_label} = {c1}"
         else:
-            title_label = self._L("K\u207b\u00b9 \u00d7 C = P  (mod 26)", "K\u207b\u00b9 \u00d7 C = P  (mod 26)")
-            row_note = f"({matrix[0][0]}\u00b7{p1} + {matrix[0][1]}\u00b7{p2}) mod 26 = {c1}"
+            title_label = self._L(f"K⁻¹ × C = P  ({mod_label})", f"K⁻¹ × C = P  ({mod_label})")
+            row_note = f"({matrix[0][0]}·{p1} + {matrix[0][1]}·{p2}) {mod_label} = {c1}"
         canvas.create_text(ox + 13, 100, text=title_label, font=("Cascadia Code", 11, "bold"), fill=color, anchor="w")
         canvas.create_text(ox + 13, 116, text=row_note, font=("Cascadia Code", 9), fill=T["TEXT_GRAY"], anchor="w")
-
     def _rsa_power_canvas(self, m_text, m, c, e, n, color="#7c3aed"):
         canvas = self._analysis_canvas(340, 96)
         steps = [(m_text, str(m), color), ("\u2191", "m\u1d40", "#a78bfa"), (str(c), "c = m\u1d40 mod n", "#34d399")]
@@ -763,11 +770,12 @@ class AnalysisViewMixin:
         T = self._T
         key = int(self._analysis_key_raw(1))
         shift = key if operation == "encrypt" else -key
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
         self._analysis_hero(
             self._L("إزاحة قيصر  Caesar Shift", "Caesar Shift"),
             self._L(
-                f"كُل حرف يُزاح {abs(shift)} خانه {'يميناً على الأبجدية' if shift > 0 else 'يساراً على الأبجدية'} — E(x) = (x {shift:+}) mod 26",
-                f"Each letter is shifted {abs(shift)} place{'s' if abs(shift) != 1 else ''} {'right' if shift > 0 else 'left'} in the alphabet — E(x) = (x {shift:+}) mod 26"
+                f"كُل حرف يُزاح {abs(shift)} خانه {'يميناً على الأبجدية' if shift > 0 else 'يساراً على الأبجدية'} — E(x) = (x {shift:+}) {mod_label}",
+                f"Each letter is shifted {abs(shift)} place{'s' if abs(shift) != 1 else ''} {'right' if shift > 0 else 'left'} in the alphabet — E(x) = (x {shift:+}) {mod_label}"
             ),
             "#7c3aed",
             "\U0001f3a1"
@@ -778,8 +786,8 @@ class AnalysisViewMixin:
         ])
         self._analysis_note(
             self._L(
-                "الأبجدية دائرة! الحروف الـ26 مرتبة على شكل حلقة — بعد حرف Z نعود مباشرة إلى A. لذلك عندما يلتقي الإزاحة بنهاية الدائرة فإنها تلتف بشكل تلقائي.",
-                "The alphabet is a circle! The 26 letters are arranged on a ring — after Z we return directly to A. So when the shift reaches the end of the ring it wraps around automatically."
+                f"الأبجدية دائرة! الحروف الـ{modulus} مرتبة على شكل حلقة — بعد {alphabet[modulus - 1]} نعود مباشرة إلى {alphabet[0]}. لذلك عندما يلتقي الإزاحة بنهاية الدائرة فإنها تلتف بشكل تلقائي.",
+                f"The alphabet is a circle! The {modulus} letters are arranged on a ring — after {alphabet[modulus - 1]} we return directly to {alphabet[0]}. So when the shift reaches the end of the ring it wraps around automatically."
             ),
             "#7c3aed",
             "\U0001f501"
@@ -810,7 +818,7 @@ class AnalysisViewMixin:
             wheel_scroll.pack(fill="x", padx=6, pady=(2, 6))
             self._enable_horizontal_scroll(wheel_scroll)
             # build wheels in small batches to keep UI responsive
-            self._build_caesar_wheels_batch(shown, shift, wheel_scroll, 0, truncated, letters, MAX_WHEELS)
+            self._build_caesar_wheels_batch(shown, shift, wheel_scroll, 0, truncated, letters, MAX_WHEELS, alphabet, modulus)
             # ---- الطريقة الثانية: تحويل نصي أنيق لكل حرف ----
             rows_title = ctk.CTkLabel(
                 self.analysis_content,
@@ -826,18 +834,19 @@ class AnalysisViewMixin:
             rows_card = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_INPUT"], corner_radius=12, border_width=1, border_color=T["BORDER_COLOR"])
             rows_card.pack(fill="x", padx=6, pady=(0, 4))
             for i, ch in enumerate(shown):
-                enc = chr(((ord(ch) - 65 + shift) % 26) + 65) if 'A' <= ch <= 'Z' else ch
+                p_idx = index_map.get(ch)
+                enc = alphabet[(p_idx + shift) % modulus] if p_idx is not None else ch
                 row = ctk.CTkFrame(rows_card, fg_color="#1e1a33" if i % 2 == 0 else "transparent")
                 row.pack(fill="x", padx=10, pady=2)
                 self._analysis_tile(row, ch, "#7c3aed")
                 self._analysis_arrow(row, "#a78bfa")
-                if 'A' <= ch <= 'Z':
+                if p_idx is not None:
                     self._analysis_tile(row, enc, "#f59e0b")
                     ctk.CTkLabel(
                         row,
                         text=self._L(
-                            f"{ch} = {ord(ch)-65} ، {ord(ch)-65}{shift:+} mod 26 = {(ord(ch)-65+shift)%26}",
-                            f"{ch}={ord(ch)-65}, ({ord(ch)-65}{shift:+}) mod 26 = {(ord(ch)-65+shift)%26}"
+                            f"{ch} = {p_idx} ، {p_idx}{shift:+} {mod_label} = {(p_idx + shift) % modulus}",
+                            f"{ch}={p_idx}, ({p_idx}{shift:+}) {mod_label} = {(p_idx + shift) % modulus}"
                         ),
                         font=("Cascadia Code", 11, "bold"),
                         text_color="#8b84a8",
@@ -870,17 +879,18 @@ class AnalysisViewMixin:
                 wraplength=1600,
                 justify="center"
             ).pack(fill="x", padx=12, pady=(0, 6))
-
     def _analyze_affine(self, text, operation):
         T = self._T
         m = int(self._analysis_key_raw(1))
         k = int(self._analysis_key_raw(2))
-        inv_m = CryptoCore.mod_inverse(m, 26)
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
+        inv_m = CryptoCore.mod_inverse(m, modulus)
+        coprime = math.gcd(m, modulus)
         self._analysis_hero(
             self._L("التحويل الخطي المتآلف  Affine", "Affine Cipher"),
             self._L(
-                f"معادلة {('التشفير' if operation=='encrypt' else 'فك التشفير')} على الحرف x بتطبيق (m\u00b7x + k) ثم أخذ mod 26",
-                f"{'Encryption' if operation=='encrypt' else 'Decryption'} formula on letter x: apply (m\u00b7x + k) then take mod 26"
+                f"معادلة {('التشفير' if operation=='encrypt' else 'فك التشفير')} على الحرف x بتطبيق (m\u00b7x + k) ثم أخذ {mod_label}",
+                f"{'Encryption' if operation=='encrypt' else 'Decryption'} formula on letter x: apply (m\u00b7x + k) then take {mod_label}"
             ),
             "#06b6d4",
             "\U0001f9ee"
@@ -889,13 +899,14 @@ class AnalysisViewMixin:
             ("a", m, "#22d3ee", "\U0001f522"),
             ("b", k, "#22d3ee", "\U0001f522"),
             ("a\u207b\u00b9", inv_m, "#67e8f9", "\U0001f504"),
-            ("gcd(a,26)", math.gcd(m, 26), "#a5f3fc", "\u2714\ufe0f"),
+            (f"gcd(a,{modulus})", coprime, "#a5f3fc", "\u2714\ufe0f"),
         ])
-        if math.gcd(m, 26) == 1:
+        coprime_hint = ", ".join(str(x) for x in [c for c in range(2, modulus) if math.gcd(c, modulus) == 1][:4])
+        if coprime == 1:
             self._analysis_note(
                 self._L(
-                    f"شرط الحل: gcd(a, 26) = 1 يعني أن «a» أوليّ مع 26. عكسياً، لفك التشفير نضرب بالمعكوس a\u207b\u00b9 = {inv_m} لأن {m}\u00d7{inv_m} ≡ 1 (mod 26) — بهذه الطريقة يلغي التشفير نفسه.",
-                    f"Solvability condition: gcd(a, 26) = 1 means a is coprime with 26. To decrypt we multiply by the modular inverse a\u207b\u00b9 = {inv_m} because {m}\u00d7{inv_m} ≡ 1 (mod 26) — this cancels the encryption perfectly."
+                    f"شرط الحل: gcd(a, {modulus}) = 1 يعني أن «a» أوليّ مع {modulus}. عكسياً، لفك التشفير نضرب بالمعكوس a\u207b\u00b9 = {inv_m} لأن {m}\u00d7{inv_m} \u2261 1 ({mod_label}) — بهذه الطريقة يلغي التشفير نفسه.",
+                    f"Solvability condition: gcd(a, {modulus}) = 1 means a is coprime with {modulus}. To decrypt we multiply by the modular inverse a\u207b\u00b9 = {inv_m} because {m}\u00d7{inv_m} \u2261 1 ({mod_label}) — this cancels the encryption perfectly."
                 ),
                 "#06b6d4",
                 "\u2714\ufe0f"
@@ -903,17 +914,22 @@ class AnalysisViewMixin:
         else:
             self._analysis_note(
                 self._L(
-                    "انتبه: gcd(a, 26) ≠ 1 يعني أن التشفير غير قابل للفك (غير قابل للانعكاس) — يجب اختيار a أوليّ مع 26 مثل 3 أو 5 أو 7 أو 9...",
-                    "Caution: gcd(a, 26) ≠ 1 means the cipher is not reversible — you must choose a coprime with 26, e.g. 3, 5, 7, 9..."
+                    f"انتبه: gcd(a, {modulus}) \u2260 1 يعني أن التشفير غير قابل للفك (غير قابل للانعكاس) — يجب اختيار a أوليّ مع {modulus} مثل {coprime_hint}...",
+                    f"Caution: gcd(a, {modulus}) \u2260 1 means the cipher is not reversible — you must choose a coprime with {modulus}, e.g. {coprime_hint}..."
                 ),
                 "#ef4444",
                 "\u26a0\ufe0f"
             )
+        first = next((ch for ch in text if ch in index_map), None)
+        if first is not None:
+            x0 = index_map[first]
+            res0 = alphabet[(m * x0 + k) % modulus] if operation == "encrypt" else alphabet[(inv_m * (x0 - k)) % modulus]
+        nums_label = f"{alphabet[0]}=0، ..., {alphabet[modulus - 1]}={modulus - 1}" if modulus == 28 else f"({alphabet[0]}=0, B=1, ..., {alphabet[modulus - 1]}={modulus - 1})"
         if operation == "encrypt":
             self._analysis_note(
                 self._L(
-                    f"خطوات التشفير: 1) حوّل الحرف إلى رقم x (A=0, B=1, ..., Z=25). 2) احسب (m\u00d7x + k) mod 26. 3) حوّل الرقم الناتج إلى حرف. النتيجة: {chr((m * (ord(text.upper()[0]) - 65) + k) % 26 + 65)}",
-                    f"Encryption steps: 1) Convert letter to number x (A=0, B=1, ..., Z=25). 2) Compute (m\u00d7x + k) mod 26. 3) Convert result back to letter. Result: {chr((m * (ord(text.upper()[0]) - 65) + k) % 26 + 65)}"
+                    f"خطوات التشفير: 1) حوّل الحرف إلى رقم x {nums_label}. 2) احسب (m\u00d7x + k) {mod_label}. 3) حوّل الرقم الناتج إلى حرف. النتيجة: {res0 if first is not None else '—'}",
+                    f"Encryption steps: 1) Convert letter to number x {nums_label}. 2) Compute (m\u00d7x + k) {mod_label}. 3) Convert result back to letter. Result: {res0 if first is not None else '—'}"
                 ),
                 "#22d3ee",
                 "\U0001f522"
@@ -921,14 +937,14 @@ class AnalysisViewMixin:
         else:
             self._analysis_note(
                 self._L(
-                    f"خطوات فك التشفير: 1) حوّل الحرف المشفر إلى رقم x. 2) احسب a\u207b\u00b9\u00d7(x - k) mod 26. 3) حوّل الرقم الناتج إلى الحرف الأصلي. النتيجة: {chr((inv_m * ((ord(text.upper()[0]) - 65) - k)) % 26 + 65)}",
-                    f"Decryption steps: 1) Convert encrypted letter to number x. 2) Compute a\u207b\u00b9\u00d7(x - k) mod 26. 3) Convert result back to original letter. Result: {chr((inv_m * ((ord(text.upper()[0]) - 65) - k)) % 26 + 65)}"
+                    f"خطوات فك التشفير: 1) حوّل الحرف المشفر إلى رقم x. 2) احسب a\u207b\u00b9\u00d7(x - k) {mod_label}. 3) حوّل الرقم الناتج إلى الحرف الأصلي. النتيجة: {res0 if first is not None else '—'}",
+                    f"Decryption steps: 1) Convert encrypted letter to number x. 2) Compute a\u207b\u00b9\u00d7(x - k) {mod_label}. 3) Convert result back to original letter. Result: {res0 if first is not None else '—'}"
                 ),
                 "#22d3ee",
                 "\U0001f504"
             )
         upper = text.upper()
-        samples = [c for c in upper if c.isalpha()]
+        samples = [c for c in upper if c in index_map]
         shown = samples[:6]
         m2_title = ctk.CTkLabel(
             self.analysis_content,
@@ -953,9 +969,9 @@ class AnalysisViewMixin:
             for j in range(3):
                 if i + j < len(shown):
                     ch = shown[i + j]
-                    x = ord(ch) - 65
-                    res = (m * x + k) % 26 if operation == "encrypt" else (inv_m * (x - k)) % 26
-                    self._affine_ring_canvas(m, k, x, res, "#06b6d4", parent=ring_row)
+                    x = index_map[ch]
+                    res = (m * x + k) % modulus if operation == "encrypt" else (inv_m * (x - k)) % modulus
+                    self._affine_ring_canvas(m, k, x, res, "#06b6d4", parent=ring_row, alphabet=alphabet, modulus=modulus, mod_label=mod_label)
         if len(samples) > 6:
             ctk.CTkLabel(self.analysis_content, text=self._L("... الحروف الباقية تُرسم بنفس الطريقة (اقتطاع للأداء)", "... remaining letters drawn the same way (truncated for performance)"), font=("Segoe UI", 10), text_color=T["TEXT_MUTED"]).pack(pady=(0, 4))
         rows_title = ctk.CTkLabel(
@@ -976,25 +992,29 @@ class AnalysisViewMixin:
             row.pack(fill="x", padx=10, pady=2)
             ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side="left", padx=2)
             self._analysis_arrow(row, "#06b6d4")
-            if ch.isalpha():
-                x = ord(ch) - 65
+            p_idx = index_map.get(ch)
+            if p_idx is not None:
                 if operation == "encrypt":
-                    c = (m * x + k) % 26
-                    formula = f"({m}\u00d7{x} + {k}) mod 26 = {c}"
+                    c = (m * p_idx + k) % modulus
+                    formula = f"({m}\u00d7{p_idx} + {k}) {mod_label} = {c}"
                 else:
-                    c = (inv_m * (x - k)) % 26
-                    formula = f"{inv_m}\u00d7({x} - {k}) mod 26 = {c}"
-                self._analysis_tile(row, chr(c + 65), "#06b6d4")
+                    c = (inv_m * (p_idx - k)) % modulus
+                    formula = f"{inv_m}\u00d7({p_idx} - {k}) {mod_label} = {c}"
+                self._analysis_tile(row, alphabet[c], "#06b6d4")
                 ctk.CTkLabel(row, text=formula, font=("Cascadia Code", 11, "bold"), text_color="#67e8f9", padx=10).pack(side="left")
             else:
                 self._analysis_tile(row, ch, "#64748b")
                 ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side="left")
-
     def _analyze_vigenere(self, text, operation):
         T = self._T
-        key = self._analysis_key_raw(1).upper()
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
+        mode_ar = modulus == 28
+        raw_key = self._analysis_key_raw(1)
+        key = normalize_arabic(raw_key.strip()) if mode_ar else raw_key.strip().upper()
         if not key:
-            key = "A"
+            key = "ا" if mode_ar else "A"
+        if any(kv not in index_map for kv in key):
+            raise ValueError(self._L(f"مفتاح غير قابل للتحليل في هذه الأبجدية ({key})", f"Key not analyzable in this alphabet ({key})"))
         self._analysis_hero(
             self._L("شيفرة فيجينير  Vigen\u00e8re", "Vigen\u00e8re Cipher"),
             self._L(
@@ -1004,22 +1024,30 @@ class AnalysisViewMixin:
             "#f59e0b",
             "\U0001f4d6"
         )
-        letters = [(i, ch) for i, ch in enumerate(text.upper()) if ch.isalpha()]
+        u = text.upper()
+        # مواقع الحروف مع عدّاد المفتاح — نفس منطق النواة (الحروف فقط تستهلك المفتاح)
+        letters = []
+        mapped = {}
+        ki = 0
+        for i, ch in enumerate(u):
+            if ch in index_map:
+                mapped[i] = ki
+                letters.append((i, ch, ki))
+                ki += 1
         if letters:
             key_row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
             key_row.pack(fill="x", padx=8, pady=(6, 0))
             ctk.CTkLabel(key_row, text="Key:", font=("Segoe UI", 11, "bold"), text_color=T["TEXT_GRAY"]).pack(side="left", padx=2)
-            for i, ch in enumerate(text.upper()):
-                if ch.isalpha():
-                    kv = key[i % len(key)]
-                    self._analysis_tile(key_row, kv, "#f59e0b", size=16, width=38, height=38)
-            fi, fch = letters[0]
-            fk = key[fi % len(key)]
-            self._vigenere_strip(fk, ord(fch) - 65, "#f59e0b")
+            for _, _, ki_i in letters:
+                kv = key[ki_i % len(key)]
+                self._analysis_tile(key_row, kv, "#f59e0b", size=16, width=38, height=38)
+            fi, fch, fki = letters[0]
+            fk = key[fki % len(key)]
+            self._vigenere_strip(fk, index_map[fch], "#f59e0b", alphabet, modulus)
             self._analysis_note(
                 self._L(
-                    "المفتاح يتكرر دورياً: كُل حرف من النص يُزاح بإزاحة الحرف المقابل له من المفتاح (مثلاً K = 10)، ثم يُدوَّر الناتج حول دائرة الأبجدية بنفس فكرة قيصر.",
-                    "The keyword repeats cyclically: each plaintext letter is shifted by its matching keyword letter (e.g. K = 10), then the result wraps around the alphabet circle just like Caesar."
+                    "المفتاح يتكرر دورياً: كُل حرف من النص يُزاح بإزاحة الحرف المقابل له من المفتاح، ثم يُدوَّر الناتج حول دائرة الأبجدية بنفس فكرة قيصر.",
+                    "The keyword repeats cyclically: each plaintext letter is shifted by its matching keyword letter, then the result wraps around the alphabet circle just like Caesar."
                 ),
                 "#f59e0b",
                 "\U0001f504"
@@ -1035,63 +1063,69 @@ class AnalysisViewMixin:
                 anchor="w"
             )
             m2_title.pack(fill="x", padx=10, pady=(12, 2))
-            for si, (sidx, sch) in enumerate(letters):
-                sk = key[sidx % len(key)]
-                self._vigenere_strip(sk, ord(sch) - 65, "#f59e0b")
+            for sidx, sch, ski in letters:
+                sk = key[ski % len(key)]
+                self._vigenere_strip(sk, index_map[sch], "#f59e0b", alphabet, modulus)
+            nums_label = f"{alphabet[0]}=0، ..., {alphabet[modulus - 1]}={modulus - 1}" if modulus == 28 else f"(A=0, B=1, ..., {alphabet[modulus - 1]}={modulus - 1})"
+            if operation == "encrypt":
+                steps_ar = f"خطوات التشفير: 1) كرر المفتاح حتى يساوي طول النص. 2) حوّل كل حرف إلى رقم {nums_label}. 3) اجمع رقم الحرف مع رقم حرف المفتاح المقابل. 4) خذ الناتج {mod_label}. 5) حوّل الرقم إلى حرف."
+                steps_en = f"Encryption steps: 1) Repeat the key to match text length. 2) Convert each letter to number {nums_label}. 3) Add the letter number with the matching key letter number. 4) Take {mod_label}. 5) Convert result back to letter."
+            else:
+                steps_ar = f"خطوات فك التشفير: 1) حوّل كل حرف إلى رقم {nums_label}. 2) اطرح رقم حرف المفتاح من رقم الحرف. 3) خذ الناتج {mod_label}. 4) حوّل الرقم إلى حرف."
+                steps_en = f"Decryption steps: 1) Convert each letter to number {nums_label}. 2) Subtract the key letter number from the letter number. 3) Take {mod_label}. 4) Convert result back to letter."
             self._analysis_note(
-                self._L(
-                    f"خطوات {'التشفير' if operation == 'encrypt' else 'فك التشفير'}: 1) {'كرر المفتاح حتى يساوي طول النص. 2' if operation == 'encrypt' else ''}حوّل كل حرف إلى رقم (A=0, B=1, ..., Z=25). {'3) اجمع رقم الحرف مع رقم حرف المفتاح المقابل. 4' if operation == 'encrypt' else '2) اطرح رقم حرف المفتاح من رقم الحرف. 3'} خذ الناتج mod 26. {'5' if operation == 'encrypt' else '4'}) حوّل الرقم إلى حرف.",
-                    f"{'Encryption' if operation == 'encrypt' else 'Decryption'} steps: 1{') Repeat the key to match text length. 2' if operation == 'encrypt' else ''}) Convert each letter to number (A=0, B=1, ..., Z=25). {'3) Add the letter number with the matching key letter number. 4' if operation == 'encrypt' else '2) Subtract the key letter number from the letter number. 3'}) Take mod 26. {'5' if operation == 'encrypt' else '4'}) Convert result back to letter."
-                ),
+                self._L(steps_ar, steps_en),
                 "#f59e0b",
                 "\U0001f522"
             )
-        for i, ch in enumerate(text.upper()):
+        for i, ch in enumerate(u):
             row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=4)
             ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side="left", padx=2)
             self._analysis_arrow(row, "#f59e0b")
-            if ch.isalpha():
-                p = ord(ch) - 65
-                kv = key[i % len(key)]
-                k = ord(kv) - 65
+            p = index_map.get(ch)
+            if p is not None:
+                ki_i = mapped[i]
+                kv = key[ki_i % len(key)]
+                k = index_map[kv]
                 if operation == "encrypt":
-                    c = (p + k) % 26
-                    formula = f"({p} + {k}) mod 26 = {c}"
+                    c = (p + k) % modulus
+                    formula = f"({p} + {k}) {mod_label} = {c}"
                 else:
-                    c = (p - k) % 26
-                    formula = f"({p} - {k}) mod 26 = {c}"
-                self._analysis_tile(row, chr(c + 65), "#f59e0b")
+                    c = (p - k) % modulus
+                    formula = f"({p} - {k}) {mod_label} = {c}"
+                self._analysis_tile(row, alphabet[c], "#f59e0b")
                 ctk.CTkLabel(row, text=f"[{kv} {k}]  {formula}", font=("Cascadia Code", 11, "bold"), text_color="#fcd34d", padx=10).pack(side="left")
             else:
                 self._analysis_tile(row, ch, "#64748b")
                 ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side="left")
-
     def _analyze_playfair(self, text, operation):
         key = self._analysis_key_raw(1)
-        matrix = CryptoCore.playfair_matrix(key)
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
+        mode = "AR" if modulus == 28 else "EN"
+        matrix = CryptoCore.playfair_matrix(key, mode)
+        rows, cols = len(matrix), len(matrix[0])
         self._analysis_hero(
-            self._L("شبكة بلايفير 5\u00d75  Playfair", "Playfair 5\u00d75 Grid"),
+            self._L(f"شبكة بلايفير {rows}\u00d7{cols}  Playfair", f"Playfair {rows}\u00d7{cols} Grid"),
             self._L(
-                f"المفتاح «{key}» — تُحذف حروف المفتاح المكررة ثم تُكمل بقية الأبجدية، و J\u2192I",
-                f"Key «{key}» — duplicate key letters are removed, then the rest of the alphabet fills the grid, with J\u2192I"
+                f"المفتاح «{key}» — تُحذف حروف المفتاح المكررة ثم تُكمل بقية الأبجدية" + ("" if mode == "AR" else "، و J\u2192I"),
+                f"Key «{key}» — duplicate key letters are removed, then the rest of the alphabet fills the grid" + ("" if mode == "AR" else ", with J\u2192I")
             ),
             "#10b981",
             "\U0001f9f9"
         )
+        key_disp = normalize_arabic(key) if mode == "AR" else key.upper().replace("J", "I")
         seen = set()
         highlight = set()
-        for ch in key.upper():
-            if ch == "J":
-                ch = "I"
+        for ch in key_disp:
             if ch not in seen:
                 seen.add(ch)
-                for r in range(5):
-                    for c in range(5):
+                for r in range(rows):
+                    for c in range(cols):
                         if matrix[r][c] == ch:
                             highlight.add((r, c))
         self._matrix_grid(matrix, highlight, base_color="#10b981")
-        processed = self._playfair_prepare(text)
+        processed = self._playfair_prepare(text, mode)
         note = ctk.CTkLabel(self.analysis_content, text=self._L(f"النص المُجهّز: {processed}", f"Prepared text: {processed}"), font=("Cascadia Code", 12, "bold"), text_color="#059669", anchor="w")
         note.pack(fill="x", padx=10, pady=(6, 2))
         for i in range(0, len(processed), 2):
@@ -1100,14 +1134,15 @@ class AnalysisViewMixin:
 
     def _playfair_digraph(self, a, b, matrix, op):
         T = self._T
+        rows, cols = len(matrix), len(matrix[0])
         def find(letter):
-            for r in range(5):
-                for c in range(5):
+            for r in range(rows):
+                for c in range(cols):
                     if matrix[r][c] == letter:
                         return r, c
             return 0, 0
         def move(r, c, dr, dc):
-            return (r + dr) % 5, (c + dc) % 5
+            return (r + dr) % rows, (c + dc) % cols
         r1, c1 = find(a)
         r2, c2 = find(b)
         self._playfair_rect_canvas(matrix, a, b, op, "#10b981")
@@ -1132,30 +1167,31 @@ class AnalysisViewMixin:
         self._analysis_tile(row_f, matrix[nr1][nc1], "#34d399", sub=f"{nr1},{nc1}", size=18, width=44, height=44)
         self._analysis_tile(row_f, matrix[nr2][nc2], "#34d399", sub=f"{nr2},{nc2}", size=18, width=44, height=44)
         ctk.CTkLabel(row_f, text=rule, font=("Segoe UI", 11, "bold"), text_color="#059669", padx=10).pack(side="left")
-
     def _analyze_hill(self, text, operation):
-        matrix = CryptoCore.hill_matrix(self._analysis_key_raw(1))
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
+        mode = "AR" if modulus == 28 else "EN"
+        matrix = CryptoCore.hill_matrix(self._analysis_key_raw(1), mode)
         self._analysis_hero(
             self._L("شيفرة هيل 2\u00d72  Hill", "Hill Cipher 2\u00d72"),
             self._L(
-                "تُقسم الرسالة إلى أزواج، كُل زوج يُضرب بمصفوفة المفتاح، ثم يؤخذ الناتج (mod 26)",
-                "The message is split into pairs; each pair is multiplied by the key matrix, then the result is taken (mod 26)"
+                f"تُقسم الرسالة إلى أزواج، كُل زوج يُضرب بمصفوفة المفتاح، ثم يؤخذ الناتج ({mod_label})",
+                f"The message is split into pairs; each pair is multiplied by the key matrix, then the result is taken ({mod_label})"
             ),
             "#ec4899",
             "\U0001f9ee"
         )
         self._analysis_chips([
             (self._L("مصفوفة المفتاح", "Key matrix"), f"[{matrix[0][0]} {matrix[0][1]}; {matrix[1][0]} {matrix[1][1]}]", "#f472b6", "\U0001f5c2"),
-            (self._L("الحساب", "Math"), "(mod 26)", "#fda4af", "\u2211"),
+            (self._L("الحساب", "Math"), f"({mod_label})", "#fda4af", "\u2211"),
         ])
         self._matrix_grid(matrix, base_color="#ec4899")
-        det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
+        det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % modulus
         try:
-            inv_det = CryptoCore.mod_inverse(det, 26)
+            inv_det = CryptoCore.mod_inverse(det, modulus)
             self._analysis_note(
                 self._L(
-                    f"كُل زوج يُعامَل كمتجه [x, y] ويُضرب بالمصفوفة. للتشفير خذ (mod 26)؛ للفك نوجد det = {det} ثم نفرّق على {inv_det} لأنه det\u00d7{inv_det} ≡ 1 (mod 26). لماذا يعمل؟ لأن {matrix[0][0]}\u00d7{inv_det}... إلخ تُنتج المصفوفة العكسية التي تُلغي الأولى بالضرب.",
-                    f"Each pair is treated as a vector [x, y] and multiplied by the matrix. To encrypt just take (mod 26); to decrypt we compute det = {det} then scale the inverse matrix by {inv_det} because det\u00d7{inv_det} ≡ 1 (mod 26). Why does it work? The scaled cofactors produce the inverse matrix that cancels the original by multiplication."
+                    f"كُل زوج يُعامَل كمتجه [x, y] ويُضرب بالمصفوفة. للتشفير خذ ({mod_label})؛ للفك نوجد det = {det} ثم نفرّق على {inv_det} لأنه det\u00d7{inv_det} \u2261 1 ({mod_label}). لماذا يعمل؟ لأن {matrix[0][0]}\u00d7{inv_det}... إلخ تُنتج المصفوفة العكسية التي تُلغي الأولى بالضرب.",
+                    f"Each pair is treated as a vector [x, y] and multiplied by the matrix. To encrypt just take ({mod_label}); to decrypt we compute det = {det} then scale the inverse matrix by {inv_det} because det\u00d7{inv_det} \u2261 1 ({mod_label}). Why does it work? The scaled cofactors produce the inverse matrix that cancels the original by multiplication."
                 ),
                 "#ec4899",
                 "\U0001f9ee"
@@ -1163,22 +1199,22 @@ class AnalysisViewMixin:
         except Exception:
             self._analysis_note(
                 self._L(
-                    f"تنبيه: مصفوفة المفتاح غير قابلة للعكس لأن det = {det} ليس أوليّاً مع 26 — لن يعمل فك التشفير.",
-                    f"Warning: the key matrix is not invertible because det = {det} is not coprime with 26 — decryption will not work."
+                    f"تنبيه: مصفوفة المفتاح غير قابلة للعكس لأن det = {det} ليس أوليّاً مع {modulus} — لن يعمل فك التشفير.",
+                    f"Warning: the key matrix is not invertible because det = {det} is not coprime with {modulus} — decryption will not work."
                 ),
                 "#ef4444",
                 "\u26a0\ufe0f"
             )
-        processed = "".join(cc for cc in text.upper() if cc.isalpha())
+        processed = "".join(cc for cc in text.upper() if cc in index_map)
         if not processed:
             return
         if len(processed) % 2:
-            processed += "X"
+            processed += "ط" if mode == "AR" else "X"
         m2_title = ctk.CTkLabel(
             self.analysis_content,
             text=self._L(
-                f"أو بطريقة أخرى — رسم ضرب المصفوفة × المتجه لكل زوج ({len(processed)//2} زوجاً):",
-                f"Or another way — the matrix × vector multiplication for each pair ({len(processed)//2} pair{'s' if len(processed)//2 != 1 else ''}):"
+                f"أو بطريقة أخرى — رسم ضرب المصفوفة \u00d7 المتجه لكل زوج ({len(processed)//2} زوجاً):",
+                f"Or another way — the matrix \u00d7 vector multiplication for each pair ({len(processed)//2} pair{'s' if len(processed)//2 != 1 else ''}):"
             ),
             font=("Segoe UI", 11, "bold"),
             text_color="#f9a8d4",
@@ -1186,46 +1222,45 @@ class AnalysisViewMixin:
         )
         m2_title.pack(fill="x", padx=10, pady=(12, 2))
         for vp in range(0, min(len(processed), 8), 2):
-            p1x = ord(processed[vp]) - 65
-            p2x = ord(processed[vp + 1]) - 65
+            p1x = index_map[processed[vp]]
+            p2x = index_map[processed[vp + 1]]
             shown_matrix = matrix
             if operation == "encrypt":
-                c1x = (matrix[0][0] * p1x + matrix[0][1] * p2x) % 26
-                c2x = (matrix[1][0] * p1x + matrix[1][1] * p2x) % 26
+                c1x = (matrix[0][0] * p1x + matrix[0][1] * p2x) % modulus
+                c2x = (matrix[1][0] * p1x + matrix[1][1] * p2x) % modulus
             else:
-                det2 = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
-                inv2 = CryptoCore.mod_inverse(det2, 26)
-                im = [[(matrix[1][1] * inv2) % 26, (-matrix[0][1] * inv2) % 26],
-                      [(-matrix[1][0] * inv2) % 26, (matrix[0][0] * inv2) % 26]]
-                c1x = (im[0][0] * p1x + im[0][1] * p2x) % 26
-                c2x = (im[1][0] * p1x + im[1][1] * p2x) % 26
+                det2 = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % modulus
+                inv2 = CryptoCore.mod_inverse(det2, modulus)
+                im = [[(matrix[1][1] * inv2) % modulus, (-matrix[0][1] * inv2) % modulus],
+                      [(-matrix[1][0] * inv2) % modulus, (matrix[0][0] * inv2) % modulus]]
+                c1x = (im[0][0] * p1x + im[0][1] * p2x) % modulus
+                c2x = (im[1][0] * p1x + im[1][1] * p2x) % modulus
                 shown_matrix = im
-            self._hill_vector_canvas(shown_matrix, p1x, p2x, c1x, c2x, operation, "#ec4899")
+            self._hill_vector_canvas(shown_matrix, p1x, p2x, c1x, c2x, operation, "#ec4899", modulus=modulus, mod_label=mod_label)
         for i in range(0, len(processed), 2):
-            p1, p2 = ord(processed[i]) - 65, ord(processed[i + 1]) - 65
+            p1, p2 = index_map[processed[i]], index_map[processed[i + 1]]
             if operation == "encrypt":
-                c1 = (matrix[0][0] * p1 + matrix[0][1] * p2) % 26
-                c2 = (matrix[1][0] * p1 + matrix[1][1] * p2) % 26
-                formula = f"[{matrix[0][0]} {matrix[0][1]}] \u00d7 [{p1}] = [{c1}]  (mod 26)"
+                c1 = (matrix[0][0] * p1 + matrix[0][1] * p2) % modulus
+                c2 = (matrix[1][0] * p1 + matrix[1][1] * p2) % modulus
+                formula = f"[{matrix[0][0]} {matrix[0][1]}] \u00d7 [{p1}] = [{c1}]  ({mod_label})"
                 formula2 = f"[{matrix[1][0]} {matrix[1][1]}]   [{p2}]   [{c2}]"
             else:
-                det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
-                inv_det = CryptoCore.mod_inverse(det, 26)
-                inv_m = [[(matrix[1][1] * inv_det) % 26, (-matrix[0][1] * inv_det) % 26],
-                         [(-matrix[1][0] * inv_det) % 26, (matrix[0][0] * inv_det) % 26]]
-                c1 = (inv_m[0][0] * p1 + inv_m[0][1] * p2) % 26
-                c2 = (inv_m[1][0] * p1 + inv_m[1][1] * p2) % 26
-                formula = f"K\u207b\u00b9 \u00d7 [{p1}] = [{c1}]  (mod 26)"
+                det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % modulus
+                inv_det = CryptoCore.mod_inverse(det, modulus)
+                inv_m = [[(matrix[1][1] * inv_det) % modulus, (-matrix[0][1] * inv_det) % modulus],
+                         [(-matrix[1][0] * inv_det) % modulus, (matrix[0][0] * inv_det) % modulus]]
+                c1 = (inv_m[0][0] * p1 + inv_m[0][1] * p2) % modulus
+                c2 = (inv_m[1][0] * p1 + inv_m[1][1] * p2) % modulus
+                formula = f"K\u207b\u00b9 \u00d7 [{p1}] = [{c1}]  ({mod_label})"
                 formula2 = f"         [{p2}]   [{c2}]"
             row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=4)
             self._analysis_tile(row, processed[i], "#ec4899", size=18, width=44, height=44)
             self._analysis_tile(row, processed[i + 1], "#ec4899", size=18, width=44, height=44)
             self._analysis_arrow(row, "#f472b6")
-            self._analysis_tile(row, chr(c1 + 65), "#fb7185", size=18, width=44, height=44)
-            self._analysis_tile(row, chr(c2 + 65), "#fb7185", size=18, width=44, height=44)
+            self._analysis_tile(row, alphabet[c1], "#fb7185", size=18, width=44, height=44)
+            self._analysis_tile(row, alphabet[c2], "#fb7185", size=18, width=44, height=44)
             ctk.CTkLabel(row, text=formula + "  " + formula2, font=("Cascadia Code", 10, "bold"), text_color="#fda4af", padx=10).pack(side="left")
-
     def _analyze_diffiehellman(self, input_text, output_text):
         T = self._T
         try:
@@ -1281,8 +1316,9 @@ class AnalysisViewMixin:
         ctk.CTkLabel(secret, text=self._L("\U0001f511  المفتاح المشترك السري (ناتج العملية)", "\U0001f511  Shared Secret Key (output)"), font=("Segoe UI", 13, "bold"), text_color="#cffafe").pack(pady=(8, 0))
         ctk.CTkLabel(secret, text=f"s = B\u1d43 mod p = A\u1d47 mod p = {s_alice}", font=("Cascadia Code", 16, "bold"), text_color="#ffffff").pack(pady=(0, 6))
 
-        shift = (int(s_alice) % 26) if (int(s_alice) % 26) != 0 else 26
-        msg_letters = [ch for ch in (input_text or "").upper() if ch.isalpha()]
+        alphabet, index_map, modulus, mod_label = self._alphabet_pack(input_text or "")
+        shift = (int(s_alice) % modulus) or 1  # مطابق للنواة: إزاحة غير صفرية دائمًا
+        msg_letters = [ch for ch in (input_text or "").upper() if ch in index_map]
         enc_demo = CryptoCore.dh_encrypt(input_text, p, g, a, b, self.lang) if input_text else ""
         conv = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_CARD"], corner_radius=14, border_width=1, border_color="#0e7490")
         conv.pack(fill="x", padx=6, pady=(4, 4))
@@ -1291,8 +1327,8 @@ class AnalysisViewMixin:
             "\U0001f512  Then the secret is used as a key to actually encrypt the text"
         ), font=("Segoe UI", 13, "bold"), text_color="#67e8f9", anchor="w").pack(fill="x", padx=12, pady=(8, 2))
         ctk.CTkLabel(conv, text=self._L(
-            f"نأخذ الإزاحة shift = السرّ mod 26 = {s_alice} mod 26 = {shift}، ثم نزيح كل حرف بهذا المقدار.",
-            f"We take shift = secret mod 26 = {s_alice} mod 26 = {shift}, then shift each letter by that amount."
+            f"نأخذ الإزاحة shift = السرّ {mod_label} = {s_alice} {mod_label} = {shift}، ثم نزيح كل حرف بهذا المقدار.",
+            f"We take shift = secret {mod_label} = {s_alice} {mod_label} = {shift}, then shift each letter by that amount."
         ), font=("Segoe UI", 11), text_color=T["TEXT_LIGHT"], anchor="w", wraplength=1400, justify="left").pack(fill="x", padx=12, pady=(0, 2))
         out_row = ctk.CTkFrame(conv, fg_color="transparent")
         out_row.pack(fill="x", padx=12, pady=(2, 8))
@@ -1634,21 +1670,27 @@ class AnalysisViewMixin:
         if expr:
             ctk.CTkLabel(row, text=expr, font=("Cascadia Code", 10, "bold"), text_color=accent).pack(side="left", padx=6, pady=2)
 
-    def _playfair_prepare(self, text):
-        text = text.upper().replace("J", "I").replace(" ", "")
+    def _playfair_prepare(self, text, mode="EN"):
+        if mode == "AR":
+            text = normalize_arabic(text)
+            text = "".join(ch for ch in text if ch in ARABIC_INDEX)
+            filler = "ط"
+        else:
+            text = text.upper().replace("J", "I").replace(" ", "")
+            filler = "X"
         prepared = ""
         i = 0
         while i < len(text):
             prepared += text[i]
             if i + 1 < len(text):
                 if text[i] == text[i + 1]:
-                    prepared += "X"
+                    prepared += filler
                 else:
                     prepared += text[i + 1]
                     i += 1
             else:
-                prepared += "X"
+                prepared += filler
             i += 1
         if len(prepared) % 2:
-            prepared += "X"
+            prepared += filler
         return prepared

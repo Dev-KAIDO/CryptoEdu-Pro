@@ -110,7 +110,66 @@ class TestCryptoValidation(unittest.TestCase):
 
     def test_unsupported_alphabet_is_rejected(self):
         with self.assertRaises(ValueError):
-            CryptoCore.caesar_encrypt("سلام", 3)
+            CryptoCore.caesar_encrypt("résumé", 3)
+
+    def test_arabic_text_now_supported(self):
+        encrypted = CryptoCore.caesar_encrypt("سلام", 3)
+        self.assertEqual(CryptoCore.caesar_decrypt(encrypted, 3), "سلام")
+
+class TestArabicClassical(unittest.TestCase):
+    """دعم الأبجدية العربية (28 حرفًا) في الشفرات الكلاسيكية."""
+
+    def test_caesar_ar_known_pair_and_roundtrip(self):
+        self.assertEqual(CryptoCore.caesar_encrypt("اب", 1), "بت")
+        encrypted = CryptoCore.caesar_encrypt("اهلا بالعالم", 5)
+        self.assertEqual(CryptoCore.caesar_decrypt(encrypted, 5), "اهلا بالعالم")
+
+    def test_caesar_ar_normalization(self):
+        # أ إ آ تُطبَّع إلى ا ، ة إلى ه ، ى إلى ي قبل التشفير
+        self.assertEqual(
+            CryptoCore.caesar_encrypt("أهلا", 2),
+            CryptoCore.caesar_encrypt("اهلا", 2),
+        )
+        # الهمزة المنفصلة تمر دون تشفير
+        self.assertEqual(CryptoCore.caesar_encrypt("برء", 1), "تزء")
+
+    def test_caesar_ar_digits_and_latin_pass(self):
+        # س+1=ش ل+1=م ا+1=ب م+1=ن — الأرقام والمسافات واللاتينية تمر كما هي
+        self.assertEqual(CryptoCore.caesar_encrypt("سلام 123 Hi!", 1), "\u0634\u0645\u0628\u0646 123 Hi!")
+
+    def test_vigenere_ar_known_pair_and_roundtrip(self):
+        self.assertEqual(CryptoCore.vigenere_encrypt("اب", "سس"), "سش")
+        encrypted = CryptoCore.vigenere_encrypt("اهلا تعلم بالتشفير", "شمس")
+        self.assertEqual(CryptoCore.vigenere_decrypt(encrypted, "شمس"), "اهلا تعلم بالتشفير")
+
+    def test_vigenere_ar_rejects_latin_key(self):
+        with self.assertRaises(ValueError):
+            CryptoCore.vigenere_encrypt("اهلا", "KEY")
+
+    def test_affine_ar_roundtrip_and_invalid_modulus(self):
+        encrypted = CryptoCore.affine_encrypt("ابتث", 3, 10)
+        self.assertEqual(CryptoCore.affine_decrypt(encrypted, 3, 10), "ابتث")
+        with self.assertRaises(ValueError):
+            CryptoCore.affine_encrypt("اب", 2, 1)  # gcd(2, 28) ≠ 1
+
+    def test_playfair_ar_grid_dims_and_roundtrip(self):
+        matrix = CryptoCore.playfair_matrix("سلام", "AR")
+        self.assertEqual(len(matrix), 4)
+        self.assertEqual(len(matrix[0]), 7)
+        encrypted = CryptoCore.playfair_encrypt("محمد", "سلام")
+        self.assertEqual(CryptoCore.playfair_decrypt(encrypted, "سلام"), "محمد")
+
+    def test_playfair_ar_rejects_latin_key(self):
+        with self.assertRaises(ValueError):
+            CryptoCore.playfair_encrypt("محمد", "KEY")
+
+    def test_hill_ar_numeric_key_and_roundtrip(self):
+        encrypted = CryptoCore.hill_encrypt("ابتث", "3,2,5,7")
+        self.assertEqual(CryptoCore.hill_decrypt(encrypted, "3,2,5,7"), "ابتث")
+
+    def test_hill_ar_rejects_alphabetic_key(self):
+        with self.assertRaises(ValueError):
+            CryptoCore.hill_encrypt("ابتث", "HILL")
 
 
 if __name__ == "__main__":

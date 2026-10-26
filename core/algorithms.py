@@ -2,6 +2,7 @@
 import math
 import re
 from functools import lru_cache
+from .alphabet import ARABIC_ALPHABET, ARABIC_INDEX, STANDALONE_HAMZA, is_arabic_text, normalize_arabic
 
 class CryptoCore:
     """النواة الأساسية لخوارزميات التشفير"""
@@ -20,28 +21,81 @@ class CryptoCore:
         if not key or not key.isascii() or not key.isalpha():
             raise ValueError(f"مفتاح {algorithm} يجب أن يحتوي على أحرف إنجليزية فقط")
         return key.upper()
-    
+
     @staticmethod
-    def caesar_encrypt(text, key):
-        """شفرة قيصر: إزاحة كل حرف بمقدار المفتاح"""
+    def _require_arabic_key(key, algorithm):
+        """مفتاح عربي: يُطبَّع ثم يتحقق أنه من الأبجدية العربية الثمانية والعشرين فقط."""
+        normalized = normalize_arabic(key.strip())
+        if not normalized or any(ch not in ARABIC_INDEX for ch in normalized):
+            raise ValueError(f"في النص العربي يجب أن يكون مفتاح {algorithm} حروفًا عربية فقط")
+        return normalized
+
+    @staticmethod
+    def is_arabic_text(text):
+        """يرصد وجود أي حرف عربي (مع متغيرات الهمزة والتاء المربوطة والألف المقصورة)."""
+        return is_arabic_text(text)
+
+    @staticmethod
+    def normalize_text(text):
+        """توحيد أ إ آ ٱ → ا ، ة → ه ، ى → ي ضمن سلسلة النص."""
+        return normalize_arabic(text)
+
+    @staticmethod
+    def _prepare_text(text):
+        """يكتشف الأبجدية تلقائيًا ويعيد (mode, normalized).
+
+        EN: السلوك الأصلي حرفيًا (أحرف إنجليزية فقط).
+        AR: تطبيع الهمزات والتاء المربوطة والألف المقصورة ثم قبول حروف الأبجدية
+        العربية الثمانية والعشرين فقط؛ الهمزة المنفصلة (ء) والفراغات والأرقام
+        والحروف الإنجليزية تمرّ دون تشفير.
+        """
+        if is_arabic_text(text):
+            normalized = normalize_arabic(text)
+            for ch in normalized:
+                if ch in ARABIC_INDEX or ch == STANDALONE_HAMZA:
+                    continue
+                if ch.isalpha() and ch.isascii():
+                    continue
+                if ch.isalpha():
+                    raise ValueError(f"الأبجدية العربية المدعومة 28 حرفًا فقط، والحرف «{ch}» غير مدعوم")
+            return "AR", normalized
         CryptoCore._require_latin_text(text)
+        return "EN", text
+
+    @staticmethod
+    def _shift_text(text, key, mode, sign=1):
+        """إزاحة قيصر على نص جاهز من _prepare_text (mod 26 إنجليزي / mod 28 عربي)."""
+        if mode == "AR":
+            result = ""
+            for ch in text:
+                if ch in ARABIC_INDEX:
+                    result += ARABIC_ALPHABET[(ARABIC_INDEX[ch] + sign * key) % 28]
+                else:
+                    result += ch
+            return result
         result = ""
         for char in text.upper():
             if "A" <= char <= "Z":
-                result += chr((ord(char) - 65 + key) % 26 + 65)
+                result += chr((ord(char) - 65 + sign * key) % 26 + 65)
             else:
                 result += char
         return result
 
     @staticmethod
+    def caesar_encrypt(text, key):
+        """شفرة قيصر: إزاحة كل حرف بمقدار المفتاح (26 إنجليزي / 28 عربي)"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        return CryptoCore._shift_text(normalized, key, mode, 1)
+
+    @staticmethod
     def caesar_decrypt(text, key):
         return CryptoCore.caesar_encrypt(text, -key)
-    
+
 
     @staticmethod
     def mod_inverse(a, m=26):
         """حساب المعكوس الضربي باستخدام خوارزمية Euclidean الموسعة.
-        يعمل مع أي قيمة لـ m (سواء m=26 لخوارزميات الأبجدية أو phi كبير لـ RSA)."""
+        يعمل مع أي قيمة لـ m (سواء 26/28 لخوارزميات الأبجدية أو phi كبير لـ RSA)."""
         a = a % m
         if a == 0:
             return None
@@ -59,12 +113,14 @@ class CryptoCore:
 
     @staticmethod
     def affine_encrypt(text, m, k):
-        """شفرة أفاين: (m * x + k) mod 26"""
-        CryptoCore._require_latin_text(text)
+        """شفرة أفاين: (m * x + k) mod 26 إنجليزي / mod 28 عربي"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        if mode == "AR":
+            return CryptoCore._affine_text(normalized, m, k, "encrypt")
         if math.gcd(m, 26) != 1:
             raise ValueError("يجب أن يكون المفتاح m أولي مع 26")
         result = ""
-        for char in text.upper():
+        for char in normalized.upper():
             if "A" <= char <= "Z":
                 x = ord(char) - 65
                 result += chr((m * x + k) % 26 + 65)
@@ -74,12 +130,14 @@ class CryptoCore:
 
     @staticmethod
     def affine_decrypt(text, m, k):
-        CryptoCore._require_latin_text(text)
+        mode, normalized = CryptoCore._prepare_text(text)
+        if mode == "AR":
+            return CryptoCore._affine_text(normalized, m, k, "decrypt")
         inv = CryptoCore.mod_inverse(m, 26)
         if inv is None:
             raise ValueError("لا يوجد معكوس ضربي للمفتاح m")
         result = ""
-        for char in text.upper():
+        for char in normalized.upper():
             if "A" <= char <= "Z":
                 y = ord(char) - 65
                 result += chr((inv * (y - k)) % 26 + 65)
@@ -88,14 +146,34 @@ class CryptoCore:
         return result
 
     @staticmethod
+    def _affine_text(text, m, k, operation):
+        if math.gcd(m, 28) != 1:
+            raise ValueError("في النص العربي يجب أن يكون المفتاح m أولياً مع 28")
+        inv_m = CryptoCore.mod_inverse(m, 28)
+        if inv_m is None:
+            raise ValueError("لا يوجد معكوس ضربي للمفتاح m")
+        result = ""
+        for ch in text:
+            if ch in ARABIC_INDEX:
+                x = ARABIC_INDEX[ch]
+                if operation == "encrypt":
+                    result += ARABIC_ALPHABET[(m * x + k) % 28]
+                else:
+                    result += ARABIC_ALPHABET[(inv_m * (x - k)) % 28]
+            else:
+                result += ch
+        return result
+
+    @staticmethod
     def vigenere_encrypt(text, key):
-        """شفرة فيجينير: إزاحة دورية بناءً على كلمة مفتاحية"""
-        CryptoCore._require_latin_text(text)
+        """شفرة فيجينير: إزاحة دورية بناءً على كلمة مفتاحية (عربية أو إنجليزية)"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        if mode == "AR":
+            return CryptoCore._vigenere_text(normalized, key, "encrypt")
         key = CryptoCore._require_latin_key(key, "Vigenère")
-        text = text.upper()
         result = ""
         key_idx = 0
-        for char in text:
+        for char in normalized.upper():
             if "A" <= char <= "Z":
                 shift = ord(key[key_idx % len(key)]) - 65
                 result += chr((ord(char) - 65 + shift) % 26 + 65)
@@ -106,12 +184,13 @@ class CryptoCore:
 
     @staticmethod
     def vigenere_decrypt(text, key):
-        CryptoCore._require_latin_text(text)
+        mode, normalized = CryptoCore._prepare_text(text)
+        if mode == "AR":
+            return CryptoCore._vigenere_text(normalized, key, "decrypt")
         key = CryptoCore._require_latin_key(key, "Vigenère")
-        text = text.upper()
         result = ""
         key_idx = 0
-        for char in text:
+        for char in normalized.upper():
             if "A" <= char <= "Z":
                 shift = ord(key[key_idx % len(key)]) - 65
                 result += chr((ord(char) - 65 - shift) % 26 + 65)
@@ -121,8 +200,35 @@ class CryptoCore:
         return result
 
     @staticmethod
-    def playfair_matrix(key):
-        """بناء مصفوفة بلايفير 5x5"""
+    def _vigenere_text(text, key, operation):
+        key = CryptoCore._require_arabic_key(key, "Vigenère")
+        result = ""
+        key_idx = 0
+        for ch in text:
+            if ch in ARABIC_INDEX:
+                shift = ARABIC_INDEX[key[key_idx % len(key)]]
+                pos = ARABIC_INDEX[ch]
+                if operation == "encrypt":
+                    result += ARABIC_ALPHABET[(pos + shift) % 28]
+                else:
+                    result += ARABIC_ALPHABET[(pos - shift) % 28]
+                key_idx += 1
+            else:
+                result += ch
+        return result
+
+    @staticmethod
+    def playfair_matrix(key, mode="EN"):
+        """بناء شبكة بلايفير: 5×5 للإنجليزية (J تُسقط هو I) و4×7 للعربية (28 حرفًا)."""
+        if mode == "AR":
+            key = CryptoCore._require_arabic_key(key, "Playfair")
+            matrix = []
+            seen = set()
+            for char in key + ARABIC_ALPHABET:
+                if char not in seen and char in ARABIC_INDEX:
+                    matrix.append(char)
+                    seen.add(char)
+            return [matrix[i:i + 7] for i in range(0, 28, 7)]
         key = CryptoCore._require_latin_key(key, "Playfair").replace("J", "I")
         matrix = []
         seen = set()
@@ -130,51 +236,59 @@ class CryptoCore:
             if char not in seen and "A" <= char <= "Z":
                 matrix.append(char)
                 seen.add(char)
-        return [matrix[i:i+5] for i in range(0, 25, 5)]
+        return [matrix[i:i + 5] for i in range(0, 25, 5)]
+
+    @staticmethod
+    def _find_pos(matrix, char):
+        rows = len(matrix)
+        cols = len(matrix[0]) if rows else 0
+        for r in range(rows):
+            for c in range(cols):
+                if matrix[r][c] == char:
+                    return r, c
+        return None
+
+    @staticmethod
+    def _playfair_prepared(text, filler):
+        prep = ""
+        i = 0
+        while i < len(text):
+            prep += text[i]
+            if i + 1 < len(text):
+                if text[i] == text[i + 1]:
+                    prep += filler
+                else:
+                    prep += text[i + 1]
+                    i += 1
+            else:
+                prep += filler
+            i += 1
+        if len(prep) % 2 != 0:
+            prep += filler
+        return prep
 
     @staticmethod
     def playfair_encrypt(text, key):
-        """شفرة بلايفير: تشفير أزواج الحروف باستخدام شبكة 5x5"""
-        CryptoCore._require_latin_text(text)
-        if any(not (char.isalpha() or char.isspace()) for char in text):
+        """شفرة بلايفير: تشفير أزواج الحروف (شبكة 5×5 إنجليزي / 4×7 عربي)"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        if any(not (char.isalpha() or char.isspace()) for char in normalized):
             raise ValueError("نص Playfair يجب أن يحتوي على أحرف ومسافات فقط")
-        matrix = CryptoCore.playfair_matrix(key)
-        text = text.upper().replace("J", "I").replace(" ", "")
-        text = "".join(char for char in text if "A" <= char <= "Z")
-        
-        # تجهيز النص لأزواج
-        prepared = ""
-        i = 0
-        while i < len(text):
-            prepared += text[i]
-            if i + 1 < len(text):
-                if text[i] == text[i+1]:
-                    prepared += "X"
-                else:
-                    prepared += text[i+1]
-                    i += 1
-            else:
-                prepared += "X"
-            i += 1
-        
-        if len(prepared) % 2 != 0:
-            prepared += "X"
-        
-        def find_pos(char):
-            for r in range(5):
-                for c in range(5):
-                    if matrix[r][c] == char:
-                        return r, c
-            return None
-
+        matrix = CryptoCore.playfair_matrix(key, mode)
+        if mode == "AR":
+            grid_text = "".join(ch for ch in normalized if ch in ARABIC_INDEX)
+        else:
+            grid_text = "".join(ch for ch in normalized.upper().replace("J", "I").replace(" ", "") if "A" <= ch <= "Z")
+        prepared = CryptoCore._playfair_prepared(grid_text, "ط" if mode == "AR" else "X")
+        rows = len(matrix)
+        cols = len(matrix[0])
         result = ""
         for i in range(0, len(prepared), 2):
-            r1, c1 = find_pos(prepared[i])
-            r2, c2 = find_pos(prepared[i+1])
+            r1, c1 = CryptoCore._find_pos(matrix, prepared[i])
+            r2, c2 = CryptoCore._find_pos(matrix, prepared[i + 1])
             if r1 == r2:
-                result += matrix[r1][(c1+1)%5] + matrix[r2][(c2+1)%5]
+                result += matrix[r1][(c1 + 1) % cols] + matrix[r2][(c2 + 1) % cols]
             elif c1 == c2:
-                result += matrix[(r1+1)%5][c1] + matrix[(r2+1)%5][c2]
+                result += matrix[(r1 + 1) % rows][c1] + matrix[(r2 + 1) % rows][c2]
             else:
                 result += matrix[r1][c2] + matrix[r2][c1]
         return result
@@ -182,40 +296,50 @@ class CryptoCore:
     @staticmethod
     def playfair_decrypt(text, key):
         """فك تشفير بلايفير"""
-        CryptoCore._require_latin_text(text, "النص المشفر")
-        if any(not (char.isalpha() or char.isspace()) for char in text):
+        mode, normalized = CryptoCore._prepare_text(text)
+        if any(not (char.isalpha() or char.isspace()) for char in normalized):
             raise ValueError("نص Playfair المشفر يجب أن يحتوي على أحرف ومسافات فقط")
-        matrix = CryptoCore.playfair_matrix(key)
-        text = text.upper().replace(" ", "")
-        if len(text) % 2:
+        matrix = CryptoCore.playfair_matrix(key, mode)
+        rows = len(matrix)
+        cols = len(matrix[0])
+        if mode == "AR":
+            grid_text = "".join(ch for ch in normalized if ch in ARABIC_INDEX)
+        else:
+            grid_text = "".join(ch for ch in normalized.upper().replace(" ", "") if "A" <= ch <= "Z")
+        if len(grid_text) % 2:
             raise ValueError("نص Playfair المشفر يجب أن يتكون من عدد زوجي من الأحرف")
-        
-        def find_pos(char):
-            for r in range(5):
-                for c in range(5):
-                    if matrix[r][c] == char:
-                        return r, c
-            return None
-            
+
         result = ""
-        for i in range(0, len(text), 2):
-            if i+1 >= len(text):
+        for i in range(0, len(grid_text), 2):
+            if i + 1 >= len(grid_text):
                 break
-            r1, c1 = find_pos(text[i])
-            r2, c2 = find_pos(text[i+1])
+            r1, c1 = CryptoCore._find_pos(matrix, grid_text[i])
+            r2, c2 = CryptoCore._find_pos(matrix, grid_text[i + 1])
             if r1 == r2:
-                result += matrix[r1][(c1-1)%5] + matrix[r2][(c2-1)%5]
+                result += matrix[r1][(c1 - 1) % cols] + matrix[r2][(c2 - 1) % cols]
             elif c1 == c2:
-                result += matrix[(r1-1)%5][c1] + matrix[(r2-1)%5][c2]
+                result += matrix[(r1 - 1) % rows][c1] + matrix[(r2 - 1) % rows][c2]
             else:
                 result += matrix[r1][c2] + matrix[r2][c1]
 
-        result = re.sub(r'([A-Z])X\1', r'\1\1', result)
-        return result
+        if mode == "AR":
+            filler_pattern = re.compile(r"([" + ARABIC_ALPHABET + r"])\u0637\1")
+            return filler_pattern.sub(r"\1\1", result)
+        return re.sub(r'([A-Z])X\1', r'\1\1', result)
 
     @staticmethod
-    def hill_matrix(key):
-        """بناء مصفوفة المفتاح 2x2 من كلمة مفتاحية أو أرقام"""
+    def hill_matrix(key, mode="EN"):
+        """بناء مصفوفة المفتاح 2x2 (أحرف/أرقام للإنجليزية mod 26، أرقام فقط للعربية mod 28)"""
+        if mode == "AR":
+            key = key.strip()
+            try:
+                nums = [int(value.strip()) for value in key.split(",")]
+            except (TypeError, ValueError):
+                raise ValueError("مفتاح Hill في النص العربي يجب أن يكون 4 أرقام مفصولة بفواصل") from None
+            if len(nums) != 4:
+                raise ValueError("مفتاح Hill في النص العربي يجب أن يحتوي على 4 قيم بالضبط")
+            nums[:] = [value % 28 for value in nums]
+            return [[nums[0], nums[1]], [nums[2], nums[3]]]
         key = key.strip().upper()
         if len(key) == 4 and key.isascii() and key.isalpha():
             nums = [ord(char) - 65 for char in key]
@@ -230,55 +354,81 @@ class CryptoCore:
 
     @staticmethod
     def hill_encrypt(text, key):
-        """شفرة هيل: تشفير باستخدام ضرب المصفوفات mod 26"""
-        matrix = CryptoCore.hill_matrix(key)
-        CryptoCore._require_latin_text(text)
-        if any(not (char.isalpha() or char.isspace()) for char in text):
+        """شفرة هيل: تشفير باستخدام ضرب المصفوفات (mod 26 إنجليزي / mod 28 عربي)"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        matrix = CryptoCore.hill_matrix(key, mode)
+        if any(not (char.isalpha() or char.isspace()) for char in normalized):
             raise ValueError("نص Hill يجب أن يحتوي على أحرف ومسافات فقط")
-        text = text.upper().replace(" ", "")
-        text = ''.join(c for c in text if "A" <= c <= "Z")
-
-        if len(text) % 2 != 0:
-            text += "X"
-
+        if mode == "EN":
+            grid_text = "".join(c for c in normalized.upper().replace(" ", "") if "A" <= c <= "Z")
+            if len(grid_text) % 2 != 0:
+                grid_text += "X"
+            result = ""
+            for i in range(0, len(grid_text), 2):
+                p1 = ord(grid_text[i]) - 65
+                p2 = ord(grid_text[i + 1]) - 65
+                c1 = (matrix[0][0] * p1 + matrix[0][1] * p2) % 26
+                c2 = (matrix[1][0] * p1 + matrix[1][1] * p2) % 26
+                result += chr(c1 + 65) + chr(c2 + 65)
+            return result
+        grid_text = "".join(ch for ch in normalized if ch in ARABIC_INDEX)
+        if len(grid_text) % 2 != 0:
+            grid_text += "ط"
         result = ""
-        for i in range(0, len(text), 2):
-            p1 = ord(text[i]) - 65
-            p2 = ord(text[i + 1]) - 65
-            c1 = (matrix[0][0] * p1 + matrix[0][1] * p2) % 26
-            c2 = (matrix[1][0] * p1 + matrix[1][1] * p2) % 26
-            result += chr(c1 + 65) + chr(c2 + 65)
+        for i in range(0, len(grid_text), 2):
+            p1 = ARABIC_INDEX[grid_text[i]]
+            p2 = ARABIC_INDEX[grid_text[i + 1]]
+            c1 = (matrix[0][0] * p1 + matrix[0][1] * p2) % 28
+            c2 = (matrix[1][0] * p1 + matrix[1][1] * p2) % 28
+            result += ARABIC_ALPHABET[c1] + ARABIC_ALPHABET[c2]
         return result
 
     @staticmethod
     def hill_decrypt(text, key):
-        """فك تشفير هيل: استخدام المصفوفة العكسية mod 26"""
-        matrix = CryptoCore.hill_matrix(key)
-        CryptoCore._require_latin_text(text, "النص المشفر")
-        if any(not (char.isalpha() or char.isspace()) for char in text):
+        """فك تشفير هيل: استخدام المصفوفة العكسية (mod 26 إنجليزي / mod 28 عربي)"""
+        mode, normalized = CryptoCore._prepare_text(text)
+        matrix = CryptoCore.hill_matrix(key, mode)
+        if any(not (char.isalpha() or char.isspace()) for char in normalized):
             raise ValueError("نص Hill المشفر يجب أن يحتوي على أحرف ومسافات فقط")
-        det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
-        inv_det = CryptoCore.mod_inverse(det, 26)
+        if mode == "EN":
+            det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 26
+            inv_det = CryptoCore.mod_inverse(det, 26)
+            if inv_det is None:
+                raise ValueError("المصفوفة غير قابلة للعكس (det لا يقبل المعكوس)")
+            inv_matrix = [
+                [(matrix[1][1] * inv_det) % 26, (-matrix[0][1] * inv_det) % 26],
+                [(-matrix[1][0] * inv_det) % 26, (matrix[0][0] * inv_det) % 26],
+            ]
+            grid_text = normalized.upper().replace(" ", "")
+            if len(grid_text) % 2:
+                raise ValueError("نص Hill المشفر يجب أن يتكون من عدد زوجي من الأحرف")
+            result = ""
+            for i in range(0, len(grid_text), 2):
+                c1 = ord(grid_text[i]) - 65
+                c2 = ord(grid_text[i + 1]) - 65
+                p1 = (inv_matrix[0][0] * c1 + inv_matrix[0][1] * c2) % 26
+                p2 = (inv_matrix[1][0] * c1 + inv_matrix[1][1] * c2) % 26
+                result += chr(p1 + 65) + chr(p2 + 65)
+            return result
+        det = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) % 28
+        inv_det = CryptoCore.mod_inverse(det, 28)
         if inv_det is None:
             raise ValueError("المصفوفة غير قابلة للعكس (det لا يقبل المعكوس)")
-
         inv_matrix = [
-            [(matrix[1][1] * inv_det) % 26, (-matrix[0][1] * inv_det) % 26],
-            [(-matrix[1][0] * inv_det) % 26, (matrix[0][0] * inv_det) % 26]
+            [(matrix[1][1] * inv_det) % 28, (-matrix[0][1] * inv_det) % 28],
+            [(-matrix[1][0] * inv_det) % 28, (matrix[0][0] * inv_det) % 28],
         ]
-
-        text = text.upper().replace(" ", "")
-        if len(text) % 2:
+        grid_text = "".join(ch for ch in normalized if ch in ARABIC_INDEX)
+        if len(grid_text) % 2:
             raise ValueError("نص Hill المشفر يجب أن يتكون من عدد زوجي من الأحرف")
         result = ""
-        for i in range(0, len(text), 2):
-            c1 = ord(text[i]) - 65
-            c2 = ord(text[i + 1]) - 65
-            p1 = (inv_matrix[0][0] * c1 + inv_matrix[0][1] * c2) % 26
-            p2 = (inv_matrix[1][0] * c1 + inv_matrix[1][1] * c2) % 26
-            result += chr(p1 + 65) + chr(p2 + 65)
+        for i in range(0, len(grid_text), 2):
+            c1 = ARABIC_INDEX[grid_text[i]]
+            c2 = ARABIC_INDEX[grid_text[i + 1]]
+            p1 = (inv_matrix[0][0] * c1 + inv_matrix[0][1] * c2) % 28
+            p2 = (inv_matrix[1][0] * c1 + inv_matrix[1][1] * c2) % 28
+            result += ARABIC_ALPHABET[p1] + ARABIC_ALPHABET[p2]
         return result
-
     @staticmethod
     def is_prime(n):
         if n < 2: return False
@@ -315,32 +465,21 @@ class CryptoCore:
     @staticmethod
     def dh_encrypt(text, p, g, a, b, lang="AR"):
         """تبادل مفاتيح ديفي-هيلمان + تشفير فعلي للنص بالمفتاح المشترك.
-        يُشتقّ المفتاح المشترك ثم يُستعمل كإزاحة (shift) لكل حرف ليعطي ناتج مشفّر حقيقي."""
-        CryptoCore._require_latin_text(text)
+        يُشتقّ المفتاح المشترك ثم يُستعمل كإزاحة لكل حرف (26 إنجليزي / 28 عربي)."""
+        mode, normalized = CryptoCore._prepare_text(text)
         ka = int(CryptoCore.diffie_hellman_exchange(p, g, a, b, lang))
-        shift = (ka % 26) if (ka % 26) != 0 else 26
-        result = ""
-        for ch in text.upper():
-            if "A" <= ch <= "Z":
-                result += chr((ord(ch) - 65 + shift) % 26 + 65)
-            else:
-                result += ch
-        return result
+        modulus = 28 if mode == "AR" else 26
+        shift = (ka % modulus) or 1  # إزاحة غير صفرية دائمًا
+        return CryptoCore._shift_text(normalized, shift, mode, 1)
 
     @staticmethod
     def dh_decrypt(text, p, g, a, b, lang="AR"):
         """عكس dh_encrypt: يُشتق نفس المفتاح المشترك ويُعكَس إزاحة كل حرف لاسترجاع النص الأصلي."""
-        CryptoCore._require_latin_text(text, "النص المشفر")
+        mode, normalized = CryptoCore._prepare_text(text)
         ka = int(CryptoCore.diffie_hellman_exchange(p, g, a, b, lang))
-        shift = (ka % 26) if (ka % 26) != 0 else 26
-        result = ""
-        for ch in text.upper():
-            if "A" <= ch <= "Z":
-                result += chr((ord(ch) - 65 - shift) % 26 + 65)
-            else:
-                result += ch
-        return result
-
+        modulus = 28 if mode == "AR" else 26
+        shift = (ka % modulus) or 1
+        return CryptoCore._shift_text(normalized, shift, mode, -1)
     @staticmethod
     def rsa_encrypt(text, p, q, e, lang="AR"):
         if p > CryptoCore.MAX_EDUCATIONAL_PRIME or q > CryptoCore.MAX_EDUCATIONAL_PRIME:
