@@ -96,7 +96,7 @@ class CryptoViewMixin:
         # === 📊 شريط إحصاءات الحروف — يتحدث مع كل ضغطة في النص ===
         self._stats_canvas = ctk.CTkCanvas(
             self._input_card,
-            height=54,
+            height=64,
             bg=T["BG_INPUT"],
             highlightthickness=0,
             bd=0
@@ -245,7 +245,7 @@ class CryptoViewMixin:
         self._build_analysis_section()
     # === 📊 إحصاءات تكرار الحروف (عربي 28 / إنجليزي 26 آليًا) ===
     def _update_text_stats(self, event=None):
-        """يرسم أعمدة تكرار أعلى حروف النص المُدخل على شريط أسفل خانة النص."""
+        """يرسم أعمدة تكرار كل حروف النص المُدخل (تتسع لكل الأحرف حسب العرض)."""
         canvas = getattr(self, "_stats_canvas", None)
         if canvas is None:
             return
@@ -258,7 +258,7 @@ class CryptoViewMixin:
                 return
             canvas.delete("all")
             T = self._T
-            h = 54
+            h = 64
             w = max(int(canvas.winfo_width() or 0), int(canvas.winfo_reqwidth() or 0), 320)
             if is_arabic_text(text):
                 counts = {}
@@ -284,18 +284,20 @@ class CryptoViewMixin:
                     anchor="e"
                 )
                 return
-            col_w = 30
-            n = min(10, len(counts), max(1, (w - 230) // col_w))
             palette = ("#7c3aed", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#22d3ee", "#a78bfa", "#34d399", "#fbbf24", "#f472b6")
-            by_rank = sorted(counts.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)[:n]
+            # كل الحروف المختلفة تُعرض (حتى 26/28 عمودًا) — التباعد ينكمش تلقائيًا حسب مساحة العرض
+            by_rank = sorted(counts.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+            col_w = max(16, min(30, (w - 240) // len(by_rank)))
+            max_cols = (w - 240) // col_w
+            by_rank = by_rank[:max(1, max_cols)]
             max_count = by_rank[0][1]
             x = w - 18
             for i, (ch, cnt) in enumerate(by_rank):
                 cx = x - col_w / 2
-                bar_h = max(4, int(round(cnt / max_count * 18)))
-                canvas.create_text(cx, 13, text=ch, font=("Segoe UI", 11, "bold"), fill=T["TEXT_LIGHT"])
-                canvas.create_text(cx, 26, text=str(cnt), font=("Segoe UI", 8), fill=T["TEXT_MUTED"])
-                canvas.create_rectangle(x - col_w + 4, h - 6 - bar_h, x - 4, h - 6, fill=palette[i % len(palette)], outline="")
+                bar_h = max(3, int(round(cnt / max_count * 20)))
+                canvas.create_text(cx, 13, text=ch, font=("Segoe UI", 11 if col_w >= 24 else 10, "bold"), fill=T["TEXT_LIGHT"])
+                canvas.create_text(cx, 27, text=str(cnt), font=("Segoe UI", 8 if col_w >= 24 else 7), fill=T["TEXT_MUTED"])
+                canvas.create_rectangle(x - col_w + 3, h - 6 - bar_h, x - 3, h - 6, fill=palette[i % len(palette)], outline="")
                 x -= col_w
         except Exception:
             pass
