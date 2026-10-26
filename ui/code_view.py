@@ -235,7 +235,22 @@ class CodeViewMixin:
 
             full_code = CryptoCore.get_full_code(self.current_cipher)
 
-            self._highlight_code(full_code)
+            # إلغاء أي تلوين مؤجَّل سابق حتى لا تتراكم الاستدعاءات
+            if getattr(self, "_code_highlight_after", None):
+                try: self.after_cancel(self._code_highlight_after)
+                except Exception: pass
+                self._code_highlight_after = None
+
+            # تعبئة خفيفة فورية (بلا ترقيم/تلوين) ثم تفريغ التلوين الثقيل لاحقًا
+            try:
+                textbox = self.code_display._textbox
+                textbox.configure(state="normal")
+                textbox.delete("1.0", "end")
+                textbox.insert("1.0", full_code)
+                textbox.configure(state="disabled")
+            except Exception:
+                pass
+            self._code_highlight_after = self.after(15, lambda code=full_code: self._highlight_code(code))
 
             explanations = CryptoCore.get_explanation(self.current_cipher, self.lang)
 

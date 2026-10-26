@@ -3,6 +3,7 @@
 import customtkinter as ctk
 
 from ui.styles import AppSizes
+from core.alphabet import ARABIC_INDEX, LATIN_INDEX, is_arabic_text, normalize_arabic
 
 
 class CryptoViewMixin:
@@ -92,6 +93,17 @@ class CryptoViewMixin:
         self.input_box.pack(fill="both", expand=True, padx=15, pady=(0, 15))
         self.input_box.bind("<KeyRelease>", self.update_char_count)
         self.input_box.bind("<KeyRelease>", lambda e: self._close_analysis_page(), add="+")
+        # === 📊 شريط إحصاءات الحروف — يتحدث مع كل ضغطة في النص ===
+        self._stats_canvas = ctk.CTkCanvas(
+            self._input_card,
+            height=54,
+            bg=T["BG_INPUT"],
+            highlightthickness=0,
+            bd=0
+        )
+        self._stats_canvas.pack(fill="x", padx=15, pady=(0, 12))
+        self.input_box.bind("<KeyRelease>", self._update_text_stats, add="+")
+        self.after(60, self._update_text_stats)
 
         self._key_card = ctk.CTkFrame(self.tab_crypto, fg_color=T["BG_CARD"], corner_radius=AppSizes.CARD_RADIUS, border_width=1, border_color=T["BORDER_COLOR"])
         self._key_card.pack(fill="x", padx=25, pady=10)
@@ -231,3 +243,59 @@ class CryptoViewMixin:
         self.output_box.pack(fill="both", expand=True, padx=15, pady=(0, 15))
 
         self._build_analysis_section()
+    # === 📊 إحصاءات تكرار الحروف (عربي 28 / إنجليزي 26 آليًا) ===
+    def _update_text_stats(self, event=None):
+        """يرسم أعمدة تكرار أعلى حروف النص المُدخل على شريط أسفل خانة النص."""
+        canvas = getattr(self, "_stats_canvas", None)
+        if canvas is None:
+            return
+        try:
+            if not canvas.winfo_exists():
+                return
+            try:
+                text = self.input_box.get("1.0", "end-1c")
+            except Exception:
+                return
+            canvas.delete("all")
+            T = self._T
+            h = 54
+            w = max(int(canvas.winfo_width() or 0), int(canvas.winfo_reqwidth() or 0), 320)
+            if is_arabic_text(text):
+                counts = {}
+                for ch in normalize_arabic(text):
+                    if ch in ARABIC_INDEX:
+                        counts[ch] = counts.get(ch, 0) + 1
+                mode = self._L("عربي (28)", "Arabic (28)")
+            else:
+                counts = {}
+                for ch in text.upper():
+                    if ch in LATIN_INDEX:
+                        counts[ch] = counts.get(ch, 0) + 1
+                mode = self._L("إنجليزي (26)", "English (26)")
+            total = sum(counts.values())
+            title = f"📊 {total} {self._L('حرفًا', 'letters')} · {len(counts)} {self._L('مختلفًا', 'unique')} · {mode}"
+            canvas.create_text(14, h // 2, text=title, font=("Segoe UI", 11, "bold"), fill=T["TEXT_LIGHT"], anchor="w")
+            if not counts:
+                canvas.create_text(
+                    w - 16, h // 2,
+                    text=self._L("ابدأ بكتابة النص لعرض الإحصاءات…", "Start typing to view stats…"),
+                    font=("Segoe UI", 10),
+                    fill=T["TEXT_MUTED"],
+                    anchor="e"
+                )
+                return
+            col_w = 30
+            n = min(10, len(counts), max(1, (w - 230) // col_w))
+            palette = ("#7c3aed", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#22d3ee", "#a78bfa", "#34d399", "#fbbf24", "#f472b6")
+            by_rank = sorted(counts.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)[:n]
+            max_count = by_rank[0][1]
+            x = w - 18
+            for i, (ch, cnt) in enumerate(by_rank):
+                cx = x - col_w / 2
+                bar_h = max(4, int(round(cnt / max_count * 18)))
+                canvas.create_text(cx, 13, text=ch, font=("Segoe UI", 11, "bold"), fill=T["TEXT_LIGHT"])
+                canvas.create_text(cx, 26, text=str(cnt), font=("Segoe UI", 8), fill=T["TEXT_MUTED"])
+                canvas.create_rectangle(x - col_w + 4, h - 6 - bar_h, x - 4, h - 6, fill=palette[i % len(palette)], outline="")
+                x -= col_w
+        except Exception:
+            pass

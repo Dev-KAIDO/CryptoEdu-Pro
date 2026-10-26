@@ -130,6 +130,16 @@ class SidebarViewMixin:
         )
         self.cipher_menu.set(self.current_cipher)
         self.cipher_menu.pack(fill="x")
+        # === 🔎 بحث سريع عن الشفرة ===
+        self.cipher_search = ctk.CTkEntry(
+            cipher_section,
+            placeholder_text=self._L("🔎 اكتب للبحث عن شفرة…", "🔎 Type to search a cipher…"),
+            font=("Segoe UI", 12),
+            height=30
+        )
+        self.cipher_search.pack(fill="x", pady=(8, 2))
+        self.cipher_search.bind("<KeyRelease>", self._filter_cipher_results)
+        self.cipher_search_results = ctk.CTkFrame(cipher_section, fg_color="transparent")
 
         self.cipher_info_card = ctk.CTkFrame(
             self.sidebar,
@@ -201,3 +211,65 @@ class SidebarViewMixin:
             height=35
         )
         help_btn.pack(fill="x", pady=5)
+    # === 🔎 نتائج البحث عن الشفرات ===
+    def _filter_cipher_results(self, event=None):
+        try:
+            query = self.cipher_search.get().strip().lower()
+        except Exception:
+            return
+        frame = self.cipher_search_results
+        for w in frame.winfo_children():
+            w.destroy()
+        if not query:
+            frame.pack_forget()
+            return
+        matches = []
+        for name in algorithm_names():
+            if query in name.lower():
+                matches.append(name)
+                continue
+            display = self.language_manager.current.get(name.lower())
+            if display and query in str(display).lower():
+                matches.append(name)
+        if event is not None and getattr(event, "keysym", "") == "Return" and matches:
+            self._select_searched_cipher(matches[0])
+            return
+        if not matches:
+            frame.pack_forget()
+            return
+        T = self._T
+        frame.pack(fill="x", pady=(2, 4))
+        max_results = 7
+        for name in matches[:max_results]:
+            display = self.language_manager.current.get(name.lower(), name)
+            ctk.CTkButton(
+                frame,
+                text="🔐 " + display,
+                anchor="w",
+                height=28,
+                font=("Segoe UI", 11),
+                fg_color=T["BG_CARD"],
+                hover_color=T["BG_CARD_HOVER"],
+                text_color=T["TEXT_LIGHT"],
+                corner_radius=8,
+                command=lambda n=name: self._select_searched_cipher(n),
+            ).pack(fill="x", pady=1)
+        if len(matches) > max_results:
+            ctk.CTkLabel(
+                frame,
+                text=self._L(f"… و{len(matches) - max_results} نتيجة إضافية", f"… and {len(matches) - max_results} more"),
+                font=("Segoe UI", 9),
+                text_color=T["TEXT_MUTED"]
+            ).pack()
+
+    def _select_searched_cipher(self, name):
+        try:
+            self.cipher_search.delete(0, "end")
+            self.cipher_search_results.pack_forget()
+            for w in self.cipher_search_results.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+        if hasattr(self, "cipher_menu"):
+            self.cipher_menu.set(name)
+        self.change_cipher(name)

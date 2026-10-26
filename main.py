@@ -113,6 +113,8 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self._crypto_built = False
         self._code_built = False
         self._code_cache = {}
+        self._code_dirty = False
+        self._code_highlight_after = None
         self._analysis_build_after = None
         self._analysis_defer_after = None
         self.setup_sidebar()
@@ -351,6 +353,9 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             self.tab_code.grid(row=0, column=0, sticky="nsew")
             self._tab_btn_code.configure(fg_color=T["PRIMARY"], text_color="#ffffff", border_width=0)
             self._tab_btn_crypto.configure(fg_color="transparent", text_color=T["TEXT_GRAY"], border_width=2, border_color=T["BORDER_COLOR"])
+        if tab_name == "code" and getattr(self, "_code_dirty", False):
+            self._code_dirty = False
+            self.after(10, self.update_code_content)
         self._current_tab = tab_name
         # ensure visible canvas is updated without blocking
         self.update_idletasks()
@@ -506,7 +511,12 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             self.expl_title_label.configure(text="\U0001f4d6 " + t["explanation"])
         if hasattr(self, 'copy_code_btn'):
             self.copy_code_btn.configure(text=self._L("\U0001f4cb \u0646\u0633\u062e \u0627\u0644\u0643\u0648\u062f", "\U0001f4cb Copy Code"))
-        self.update_code_content()
+        # الأداء: إعادة بناء الشيفرة (~1200 سطر مُلوَّن) كانت تتكلف 300-570ms في كل تغيير شفرة.
+        # تُعاد الآن بعد idle إن كان التبويب ظاهرًا، وإلا تؤجَّل حتى عودة المستخدم لتبويب الشيفرة.
+        if getattr(self, "_current_tab", None) == "code":
+            self.after(10, self.update_code_content)
+        else:
+            self._code_dirty = True
 
     def _run_crypto_operation(self, operation):
         """ينفذ عملية التشفير أو فك التشفير عبر مسار موحد."""
@@ -622,6 +632,8 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
                 self.input_char_count.configure(text=str(char_count))
 
             self.status_bar.set_count(char_count, word_count)
+            if hasattr(self, "_update_text_stats"):
+                self._update_text_stats()
         except Exception:
             pass
 
