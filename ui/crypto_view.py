@@ -168,7 +168,8 @@ class CryptoViewMixin:
         )
         self.analysis_btn.pack(side="left", padx=(0, 10))
 
-        ctk.CTkFrame(main_btn_frame, width=2, height=30, fg_color=T["BORDER_COLOR"]).pack(side="left", padx=10)
+        self._btn_divider = ctk.CTkFrame(main_btn_frame, width=2, height=30, fg_color=T["BORDER_COLOR"])
+        self._btn_divider.pack(side="left", padx=10)
 
         self.copy_btn = ctk.CTkButton(
             main_btn_frame,
@@ -209,12 +210,15 @@ class CryptoViewMixin:
         )
         self.swap_btn.pack(side="right")
 
-        ctk.CTkLabel(
+        self._swap_arrow_label = ctk.CTkLabel(
             main_btn_frame,
             text="\u2194",
             font=("Segoe UI", 16),
             text_color=T["TEXT_GRAY"]
-        ).pack(side="right", padx=5)
+        )
+        self._swap_arrow_label.pack(side="right", padx=5)
+        # تصفيف الأزرار حسب اتجاه اللغة الحالي (RTL ⇒ التشفير أعلى اليمين)
+        self._layout_main_buttons()
 
         self._output_card = ctk.CTkFrame(self.tab_crypto, fg_color=T["BG_CARD"], corner_radius=AppSizes.CARD_RADIUS, border_width=1, border_color=T["BORDER_COLOR"])
         self._output_card.pack(fill="both", expand=True, padx=25, pady=10)
@@ -244,6 +248,26 @@ class CryptoViewMixin:
 
         self._build_analysis_section()
     # === 📊 إحصاءات تكرار الحروف (عربي 28 / إنجليزي 26 آليًا) ===
+    def _layout_main_buttons(self):
+        """يصفّ صف أزرار العمليات حسب الاتجاه: زر التشفير على الجهة الأولى للقراءة."""
+        needed = ("encrypt_btn", "decrypt_btn", "analysis_btn", "copy_btn", "clear_btn", "swap_btn", "_btn_divider", "_swap_arrow_label")
+        if not all(hasattr(self, a) for a in needed):
+            return
+        rtl = self.language_manager.is_rtl
+        side = "right" if rtl else "left"
+        other = "left" if rtl else "right"
+        pad = (10, 0) if rtl else (0, 10)
+        for widget, widget_pad in (
+            (self.encrypt_btn, pad), (self.decrypt_btn, pad), (self.analysis_btn, pad),
+            (self._btn_divider, (10, 10)), (self.copy_btn, pad), (self.clear_btn, (0, 0)),
+        ):
+            widget.pack_forget()
+            widget.pack(side=side, padx=widget_pad)
+        self.swap_btn.pack_forget()
+        self.swap_btn.pack(side=other)
+        self._swap_arrow_label.pack_forget()
+        self._swap_arrow_label.pack(side=other, padx=5)
+
     def _update_text_stats(self, event=None):
         """يرسم أعمدة تكرار كل حروف النص المُدخل (تتسع لكل الأحرف حسب العرض)."""
         canvas = getattr(self, "_stats_canvas", None)
@@ -260,6 +284,8 @@ class CryptoViewMixin:
             T = self._T
             h = 64
             w = max(int(canvas.winfo_width() or 0), int(canvas.winfo_reqwidth() or 0), 320)
+            # حد رقيق يفصل شريط الإحصاءات عن مربع النص ويدمجه بصرياً في البطاقة
+            canvas.create_rectangle(1, 1, max(w - 1, 2), h - 1, outline=T["BORDER_COLOR"])
             if is_arabic_text(text):
                 counts = {}
                 for ch in normalize_arabic(text):

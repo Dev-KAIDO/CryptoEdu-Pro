@@ -19,15 +19,9 @@ class AnalysisViewMixin:
     def _build_analysis_section(self):
         """زر تحليل أنيق بجانب اسم التشفير — يظهر فقط بعد تنفيذ تشفير/فك تشفير."""
         T = self._T
+        rtl_bar = self.language_manager.is_rtl
         bar = ctk.CTkFrame(self._header_frame, fg_color=T["BG_CARD"], corner_radius=12, border_width=1, border_color=T["BORDER_COLOR"])
         bar.pack(side="right", padx=(15, 0), pady=4)
-
-        ctk.CTkLabel(
-            bar,
-            text=self._L("\U0001f50d  تحليل التشفير", "\U0001f50d  Analysis"),
-            font=("Segoe UI", 12, "bold"),
-            text_color=T["PRIMARY_LIGHT"]
-        ).pack(side="left", padx=(14, 6), pady=8)
 
         self.analysis_btn_bar = ctk.CTkButton(
             bar,
@@ -41,7 +35,25 @@ class AnalysisViewMixin:
             width=74,
             command=self._show_analysis
         )
-        self.analysis_btn_bar.pack(side="right", padx=6, pady=6)
+
+        if rtl_bar:
+            # التسمية أعلى اليمين وزر (عرض) يسارها — ترتيب قراءة عربي داخل الشريحة
+            ctk.CTkLabel(
+                bar,
+                text=self._L("\U0001f50d  تحليل التشفير", "\U0001f50d  Analysis"),
+                font=("Segoe UI", 12, "bold"),
+                text_color=T["PRIMARY_LIGHT"]
+            ).pack(side="right", padx=(14, 6), pady=8)
+            self.analysis_btn_bar.pack(side="left", padx=6, pady=6)
+        else:
+            ctk.CTkLabel(
+                bar,
+                text=self._L("\U0001f50d  تحليل التشفير", "\U0001f50d  Analysis"),
+                font=("Segoe UI", 12, "bold"),
+                text_color=T["PRIMARY_LIGHT"]
+            ).pack(side="left", padx=(14, 6), pady=8)
+            self.analysis_btn_bar.pack(side="right", padx=6, pady=6)
+
         # مخفي حتى يعمل التشفير/فك التشفير أول مرة
         bar.pack_forget()
         self._analysis_bar = bar
@@ -61,9 +73,10 @@ class AnalysisViewMixin:
         header.grid_columnconfigure(1, weight=1)
         header.grid_propagate(False)
 
+        rtl_header = self.language_manager.is_rtl
         self.analysis_page_back = ctk.CTkButton(
             header,
-            text="\u2190  " + self._L("العودة إلى التشفير", "Back to Encryption"),
+            text=("\u2192  " if rtl_header else "\u2190  ") + self._L("العودة إلى التشفير", "Back to Encryption"),
             font=("Segoe UI", 13, "bold"),
             fg_color=T["SECONDARY"],
             hover_color=T["PRIMARY_LIGHT"],
@@ -72,15 +85,25 @@ class AnalysisViewMixin:
             height=38,
             command=self._close_analysis_page
         )
-        self.analysis_page_back.grid(row=0, column=0, sticky="w", padx=(20, 0), pady=13)
-
-        self.analysis_page_title = ctk.CTkLabel(
-            header,
-            text=self._L("\U0001f50d  تحليل التشفير — خطوة بخطوة", "\U0001f50d  Encryption Analysis — Step by Step"),
-            font=("Segoe UI", 16, "bold"),
-            text_color=T["PRIMARY_LIGHT"]
-        )
-        self.analysis_page_title.grid(row=0, column=1, sticky="e", padx=16)
+        # في الواجهة العربية يصير زر العودة أعلى اليمين والعنوان أعلى اليسار
+        if rtl_header:
+            self.analysis_page_back.grid(row=0, column=1, sticky="e", padx=(0, 20), pady=13)
+            self.analysis_page_title = ctk.CTkLabel(
+                header,
+                text=self._L("\U0001f50d  تحليل التشفير — خطوة بخطوة", "\U0001f50d  Encryption Analysis — Step by Step"),
+                font=("Segoe UI", 16, "bold"),
+                text_color=T["PRIMARY_LIGHT"]
+            )
+            self.analysis_page_title.grid(row=0, column=0, sticky="w", padx=16)
+        else:
+            self.analysis_page_back.grid(row=0, column=0, sticky="w", padx=(20, 0), pady=13)
+            self.analysis_page_title = ctk.CTkLabel(
+                header,
+                text=self._L("\U0001f50d  تحليل التشفير — خطوة بخطوة", "\U0001f50d  Encryption Analysis — Step by Step"),
+                font=("Segoe UI", 16, "bold"),
+                text_color=T["PRIMARY_LIGHT"]
+            )
+            self.analysis_page_title.grid(row=0, column=1, sticky="e", padx=16)
 
         self.analysis_scroll = ctk.CTkScrollableFrame(
             page,
@@ -244,6 +267,29 @@ class AnalysisViewMixin:
         except Exception:
             pass
 
+    # === ⟵ أدوات توجيه الاتجاه (RTL/LTR) للمحتوى التحليلي ===
+    def _an_rtl(self):
+        return self.language_manager.is_rtl
+
+    def _an_anchor(self):
+        return "e" if self.language_manager.is_rtl else "w"
+
+    def _an_justify(self):
+        return "right" if self.language_manager.is_rtl else "left"
+
+    def _an_side(self):
+        return "right" if self.language_manager.is_rtl else "left"
+
+    def _an_arrow(self):
+        return "\u2190" if self.language_manager.is_rtl else "\u2192"
+
+    def _ar_num(self, value):
+        """أرقام عربية-هندية في الواجهة العربية لقراءة أكثر تماسكًا."""
+        text = str(value)
+        if not self.language_manager.is_rtl:
+            return text
+        return text.translate(str.maketrans("0123456789", "\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669"))
+
     def _analysis_hero(self, title, subtitle, color, icon):
         hero = ctk.CTkFrame(self.analysis_content, fg_color=color, corner_radius=12, height=66)
         hero.pack(fill="x", pady=8, padx=6)
@@ -253,14 +299,16 @@ class AnalysisViewMixin:
             text=f"{icon}  {title}",
             font=("Segoe UI", 15, "bold"),
             text_color="#ffffff",
-            anchor="w"
+            anchor=self._an_anchor(),
+            justify=self._an_justify()
         ).pack(fill="x", padx=16, pady=(12, 0))
         ctk.CTkLabel(
             hero,
             text=subtitle,
             font=("Segoe UI", 11),
             text_color="#ffffff",
-            anchor="w",
+            anchor=self._an_anchor(),
+            justify=self._an_justify(),
             wraplength=1600
         ).pack(fill="x", padx=16, pady=(0, 6))
 
@@ -292,16 +340,18 @@ class AnalysisViewMixin:
         return LATIN_ALPHABET, LATIN_INDEX, 26, "mod 26"
     def _analysis_tile(self, parent, text, color, sub=None, size=20, width=48, height=50):
         T = self._T
+        # رمز غير أبجدي مثل الفراغ يُعرض بمربع مفتوح بدلاً من مربّع فارغ
+        text = str(text) if str(text).strip() else "\u2423"
         tile = ctk.CTkFrame(parent, fg_color=color, corner_radius=8, width=width, height=height)
-        tile.pack(side="left", padx=3)
+        tile.pack(side=self._an_side(), padx=3)
         tile.pack_propagate(False)
-        ctk.CTkLabel(tile, text=str(text), font=("Segoe UI", size, "bold"), text_color="#ffffff").pack(expand=True)
+        ctk.CTkLabel(tile, text=text, font=("Segoe UI", size, "bold"), text_color="#ffffff").pack(expand=True)
         if sub:
-            ctk.CTkLabel(parent, text=str(sub), font=("Cascadia Code", 9), text_color=T["TEXT_GRAY"], width=40).pack(side="left", padx=2)
+            ctk.CTkLabel(parent, text=str(sub), font=("Cascadia Code", 9), text_color=T["TEXT_GRAY"], width=40).pack(side=self._an_side(), padx=2)
         return tile
 
     def _analysis_arrow(self, parent, color):
-        ctk.CTkLabel(parent, text="\u2192", font=("Segoe UI", 18, "bold"), text_color=color, width=26).pack(side="left", padx=2)
+        ctk.CTkLabel(parent, text=self._an_arrow(), font=("Segoe UI", 18, "bold"), text_color=color, width=26).pack(side=self._an_side(), padx=2)
 
     def _analysis_chips(self, items):
         T = self._T
@@ -309,11 +359,11 @@ class AnalysisViewMixin:
         frame.pack(fill="x", padx=6, pady=4)
         for label, value, color, icon in items:
             chip = ctk.CTkFrame(frame, fg_color=T["BG_INPUT"], corner_radius=8, border_width=1, border_color=T["BORDER_COLOR"])
-            chip.pack(side="left", padx=4, pady=4)
+            chip.pack(side=self._an_side(), padx=4, pady=4)
             ctk.CTkLabel(chip, text=f"{icon} {label}", font=("Segoe UI", 10, "bold"), text_color=T["TEXT_GRAY"]).pack(padx=6, pady=(4, 0))
             ctk.CTkLabel(chip, text=str(value), font=("Cascadia Code", 14, "bold"), text_color=color).pack(padx=6, pady=(0, 4))
 
-    def _matrix_grid(self, rows, highlight=None, base_color="#8b5cf6", cell=46):
+    def _matrix_grid(self, rows, highlight=None, base_color="#8b5cf6", cell=46, side_note=None):
         T = self._T
         frame = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_INPUT"], corner_radius=10)
         frame.pack(fill="x", padx=6, pady=4)
@@ -328,25 +378,51 @@ class AnalysisViewMixin:
                 cell_w.grid(row=r, column=c, padx=4, pady=4)
                 cell_w.grid_propagate(False)
                 ctk.CTkLabel(cell_w, text=str(val), font=("Segoe UI", 14, "bold"), text_color=txt).place(relx=0.5, rely=0.5, anchor="center")
+        if side_note:
+            # بطاقة جانبية تستغل المساحة الفارغة بجانب الشبكة (شرح الحروف البارزة/الحجم)
+            note_title, note_items, note_caption = side_note
+            panel = ctk.CTkFrame(frame, fg_color=T["BG_CARD"], corner_radius=10, border_width=1, border_color=T["BORDER_COLOR"])
+            panel.place(relx=1.0, rely=0.5, anchor="e", x=-18)
+            ctk.CTkLabel(panel, text=note_title, font=("Segoe UI", 11, "bold"), text_color=base_color).pack(padx=14, pady=(10, 4))
+            letters_row = ctk.CTkFrame(panel, fg_color="transparent")
+            letters_row.pack(padx=10)
+            for ch, col in note_items:
+                mini = ctk.CTkFrame(letters_row, fg_color=col, corner_radius=6, width=28, height=28)
+                mini.pack(side=self._an_side(), padx=2, pady=4)
+                mini.pack_propagate(False)
+                ctk.CTkLabel(mini, text=ch, font=("Segoe UI", 12, "bold"), text_color="#ffffff").pack(expand=True)
+            ctk.CTkLabel(panel, text=note_caption, font=("Segoe UI", 10), text_color=T["TEXT_GRAY"]).pack(padx=14, pady=(2, 10))
 
     def _analysis_canvas(self, width, height):
         T = self._T
+        # تُغلَّف في صف كامل العرض، والمسطرة نفسها تتمركز بعرض محتواها الطبيعي
+        # (بدل التمدد الكامل الذي يترك مساحات ميتة على الجهة الأخرى)
+        row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
+        row.pack(fill="x", padx=6, pady=4)
         canvas = ctk.CTkCanvas(
-            self.analysis_content,
+            row,
             width=width,
             height=height,
             bg=T["BG_INPUT"],
             highlightthickness=0,
             bd=0
         )
-        canvas.pack(fill="x", padx=6, pady=4)
+        canvas.pack(anchor="center", expand=True)
         return canvas
 
     def _analysis_note(self, text, color="#10b981", icon="\U0001f4a1"):
         T = self._T
         note = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_INPUT"], corner_radius=10, border_width=1, border_color=color)
         note.pack(fill="x", padx=6, pady=4)
-        ctk.CTkLabel(note, text=f"{icon}  {text}", font=("Segoe UI", 12), text_color=color, anchor="w", wraplength=1600, justify="left").pack(fill="x", padx=12, pady=8)
+        ctk.CTkLabel(
+            note,
+            text=f"{icon}  {text}",
+            font=("Segoe UI", 12),
+            text_color=color,
+            anchor=self._an_anchor(),
+            justify=self._an_justify(),
+            wraplength=1600
+        ).pack(fill="x", padx=12, pady=8)
 
     def _caesar_wheel(self, plain_idx, res_idx, shift, color="#7c3aed", parent=None, compact=False, caption=None, alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", modulus=26, mod_label="mod 26"):
         parent = parent if parent is not None else self.analysis_content
@@ -581,12 +657,12 @@ class AnalysisViewMixin:
         s1 = 44
         canvas.create_text(info_x + 12, s1, text=self._L("الحرف الأصلي:", "Plain letter:"), font=("Segoe UI", 9, "bold"), fill="#94a3b8", anchor="nw")
         canvas.create_text(info_x + 12, s1 + 16, text=alphabet[plain_idx], font=("Segoe UI", 20, "bold"), fill="#ffffff", anchor="nw")
-        canvas.create_text(info_x + 40, s1 + 19, text=f"= {plain_idx}", font=("Segoe UI", 10), fill="#64748b", anchor="nw")
+        canvas.create_text(info_x + 40, s1 + 19, text=f"= {plain_idx}", font=("Segoe UI", 10), fill="#8fa3bd", anchor="nw")
 
         s2 = s1 + 46
         canvas.create_text(info_x + 12, s2, text=self._L("الإزاحة:", "Shift:"), font=("Segoe UI", 9, "bold"), fill="#94a3b8", anchor="nw")
         canvas.create_text(info_x + 12, s2 + 16, text=f"+{k}", font=("Segoe UI", 15, "bold"), fill=color, anchor="nw")
-        canvas.create_text(info_x + 40, s2 + 19, text=f"= {k}", font=("Segoe UI", 10), fill="#64748b", anchor="nw")
+        canvas.create_text(info_x + 40, s2 + 19, text=f"= {k}", font=("Segoe UI", 10), fill="#8fa3bd", anchor="nw")
 
         s3 = s2 + 46
         canvas.create_text(info_x + 12, s3, text=self._L("الناتج:", "Result:"), font=("Segoe UI", 9, "bold"), fill="#94a3b8", anchor="nw")
@@ -673,7 +749,7 @@ class AnalysisViewMixin:
         parent = parent if parent is not None else self.analysis_content
         W, H = 500, 400
         canvas = ctk.CTkCanvas(parent, width=W, height=H, bg=T["BG_INPUT"], highlightthickness=0, bd=0)
-        canvas.pack(side="left", padx=10, pady=10)
+        canvas.pack(side=self._an_side(), padx=10, pady=10) if parent is not None else canvas.pack(fill="x", padx=6, pady=4)
         cx, cy = 155, 200
         R, inn, step = 125, 84, 360 / modulus
         def pos(i, r):
@@ -752,7 +828,7 @@ class AnalysisViewMixin:
             title_label = self._L(f"K⁻¹ × C = P  ({mod_label})", f"K⁻¹ × C = P  ({mod_label})")
             row_note = f"({matrix[0][0]}·{p1} + {matrix[0][1]}·{p2}) {mod_label} = {c1}"
         canvas.create_text(ox + 13, 100, text=title_label, font=("Cascadia Code", 11, "bold"), fill=color, anchor="w")
-        canvas.create_text(ox + 13, 116, text=row_note, font=("Cascadia Code", 9), fill=T["TEXT_GRAY"], anchor="w")
+        canvas.create_text(ox + 13, 116, text=row_note, font=("Cascadia Code", 9), fill="#94a3b8", anchor="w")
     def _rsa_power_canvas(self, m_text, m, c, e, n, color="#7c3aed"):
         canvas = self._analysis_canvas(340, 96)
         steps = [(m_text, str(m), color), ("\u2191", "m\u1d40", "#a78bfa"), (str(c), "c = m\u1d40 mod n", "#34d399")]
@@ -799,10 +875,14 @@ class AnalysisViewMixin:
             truncated = len(letters) > MAX_WHEELS
             strip_title = ctk.CTkLabel(
                 self.analysis_content,
-                text=self._L(f"عجلة قيصر لكل حرف — مرّر أفقياً لرؤية الكل ({len(shown)}/{len(letters)}):", f"Caesar wheel for each letter — scroll horizontally ({len(shown)}/{len(letters)}):") + (self._L(" — تم اقتطاع الباقي للأداء", " — truncated for performance") if truncated else ""),
+                text=self._L(
+                    f"عجلة قيصر لكل حرف — مرّر أفقياً لرؤية الكل ({self._ar_num(len(shown))} / {self._ar_num(len(letters))}):",
+                    f"Caesar wheel for each letter — scroll horizontally ({len(shown)}/{len(letters)}):"
+                ),
                 font=("Segoe UI", 11, "bold"),
                 text_color="#a78bfa",
-                anchor="w"
+                anchor=self._an_anchor(),
+                justify=self._an_justify()
             )
             strip_title.pack(fill="x", padx=10, pady=(10, 2))
             wheel_scroll = ctk.CTkScrollableFrame(
@@ -823,12 +903,13 @@ class AnalysisViewMixin:
             rows_title = ctk.CTkLabel(
                 self.analysis_content,
                 text=self._L(
-                    f"أو بطريقة أخرى — تحويل كل حرف نصياً ({len(shown)}/{len(letters)}):",
+                    f"أو بطريقة أخرى — تحويل كل حرف نصياً ({self._ar_num(len(shown))} / {self._ar_num(len(letters))}):",
                     f"Or another way — each letter as plain text ({len(shown)}/{len(letters)}):"
                 ),
                 font=("Segoe UI", 11, "bold"),
                 text_color="#c4b5fd",
-                anchor="w"
+                anchor=self._an_anchor(),
+                justify=self._an_justify()
             )
             rows_title.pack(fill="x", padx=10, pady=(12, 4))
             rows_card = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_INPUT"], corner_radius=12, border_width=1, border_color=T["BORDER_COLOR"])
@@ -849,9 +930,9 @@ class AnalysisViewMixin:
                             f"{ch}={p_idx}, ({p_idx}{shift:+}) {mod_label} = {(p_idx + shift) % modulus}"
                         ),
                         font=("Cascadia Code", 11, "bold"),
-                        text_color="#8b84a8",
+                        text_color="#c2bce8",
                         padx=10
-                    ).pack(side="left")
+                    ).pack(side=self._an_side())
                 else:
                     self._analysis_tile(row, ch, "#64748b")
                     ctk.CTkLabel(
@@ -860,7 +941,7 @@ class AnalysisViewMixin:
                         font=("Segoe UI", 11),
                         text_color=T["TEXT_MUTED"],
                         padx=10
-                    ).pack(side="left")
+                    ).pack(side=self._an_side())
             if truncated:
                 ctk.CTkLabel(
                     self.analysis_content,
@@ -905,21 +986,36 @@ class AnalysisViewMixin:
         if coprime == 1:
             self._analysis_note(
                 self._L(
-                    f"شرط الحل: gcd(a, {modulus}) = 1 يعني أن «a» أوليّ مع {modulus}. عكسياً، لفك التشفير نضرب بالمعكوس a\u207b\u00b9 = {inv_m} لأن {m}\u00d7{inv_m} \u2261 1 ({mod_label}) — بهذه الطريقة يلغي التشفير نفسه.",
+                    "شرط حل هذا التشفير أن يكون المُعامل أوّليّاً مع حجم الأبجدية، أي لا يشاركهما في عاملٍ مشترك عددٌ أكبر من الواحد. وعند الفك نضرب بالمعكوس الضربي للمُعامل فَيُلغي الناتج التشفير تماماً ونعود إلى الحرف الأصلي.",
                     f"Solvability condition: gcd(a, {modulus}) = 1 means a is coprime with {modulus}. To decrypt we multiply by the modular inverse a\u207b\u00b9 = {inv_m} because {m}\u00d7{inv_m} \u2261 1 ({mod_label}) — this cancels the encryption perfectly."
                 ),
                 "#06b6d4",
                 "\u2714\ufe0f"
             )
+            # سطر معادلات لاتيني صافٍ منفصل عن النثر العربي
+            ctk.CTkLabel(
+                self.analysis_content,
+                text=f"gcd(a, {modulus}) = 1 \u00b7 a\u207b\u00b9 = {inv_m} \u00b7 {m}\u00d7{inv_m} \u2261 1 ({mod_label})",
+                font=("Cascadia Code", 11, "bold"),
+                text_color="#67e8f9",
+                anchor="w"
+            ).pack(fill="x", padx=12, pady=(0, 3))
         else:
             self._analysis_note(
                 self._L(
-                    f"انتبه: gcd(a, {modulus}) \u2260 1 يعني أن التشفير غير قابل للفك (غير قابل للانعكاس) — يجب اختيار a أوليّ مع {modulus} مثل {coprime_hint}...",
+                    "تنبيه: المُعامل الحالي لا يحقق شرط الأوّليّة مع حجم الأبجدية، ولذلك يفقد هذا التشفير قابلية الفك ولا يمكن الرجوع إلى النص الأصلي. يجب اختيار مُعامل جديد أوّليّ مع حجم الأبجدية، ومن الأمثلة الممكنة ما يلي…",
                     f"Caution: gcd(a, {modulus}) \u2260 1 means the cipher is not reversible — you must choose a coprime with {modulus}, e.g. {coprime_hint}..."
                 ),
                 "#ef4444",
                 "\u26a0\ufe0f"
             )
+            ctk.CTkLabel(
+                self.analysis_content,
+                text=f"gcd(a, {modulus}) \u2260 1 \u2192 not invertible \u00b7 coprime a \u2208 {{{coprime_hint}, \u2026}}",
+                font=("Cascadia Code", 11, "bold"),
+                text_color="#fca5a5",
+                anchor="w"
+            ).pack(fill="x", padx=12, pady=(0, 3))
         first = next((ch for ch in text if ch in index_map), None)
         if first is not None:
             x0 = index_map[first]
@@ -949,12 +1045,13 @@ class AnalysisViewMixin:
         m2_title = ctk.CTkLabel(
             self.analysis_content,
             text=self._L(
-                f"أو بطريقة أخرى — خريطة دوران كل حرف على الحلقة ({len(shown)}/{len(samples)}):",
+                f"أو بطريقة أخرى — خريطة دوران كل حرف على الحلقة ({self._ar_num(len(shown))} / {self._ar_num(len(samples))}):",
                 f"Or another way — the ring mapping for each letter ({len(shown)}/{len(samples)}):"
             ),
             font=("Segoe UI", 11, "bold"),
             text_color="#22d3ee",
-            anchor="w"
+            anchor=self._an_anchor(),
+            justify=self._an_justify()
         )
         m2_title.pack(fill="x", padx=10, pady=(12, 2))
         for i in range(0, len(shown), 3):
@@ -977,12 +1074,13 @@ class AnalysisViewMixin:
         rows_title = ctk.CTkLabel(
             self.analysis_content,
             text=self._L(
-                f"تفاصيل كل حرف على حدة ({len(upper)}/{len(upper)}):",
+                f"تفاصيل كل حرف على حدة ({self._ar_num(len(upper))}):",
                 f"Each letter individually ({len(upper)}/{len(upper)}):"
             ),
             font=("Segoe UI", 11, "bold"),
             text_color="#22d3ee",
-            anchor="w"
+            anchor=self._an_anchor(),
+            justify=self._an_justify()
         )
         rows_title.pack(fill="x", padx=10, pady=(8, 4))
         rows_card = ctk.CTkFrame(self.analysis_content, fg_color=T["BG_INPUT"], corner_radius=12, border_width=1, border_color=T["BORDER_COLOR"])
@@ -990,7 +1088,7 @@ class AnalysisViewMixin:
         for i, ch in enumerate(upper):
             row = ctk.CTkFrame(rows_card, fg_color="#0c2a35" if i % 2 == 0 else "transparent")
             row.pack(fill="x", padx=10, pady=2)
-            ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side="left", padx=2)
+            ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side=self._an_side(), padx=2)
             self._analysis_arrow(row, "#06b6d4")
             p_idx = index_map.get(ch)
             if p_idx is not None:
@@ -1001,10 +1099,10 @@ class AnalysisViewMixin:
                     c = (inv_m * (p_idx - k)) % modulus
                     formula = f"{inv_m}\u00d7({p_idx} - {k}) {mod_label} = {c}"
                 self._analysis_tile(row, alphabet[c], "#06b6d4")
-                ctk.CTkLabel(row, text=formula, font=("Cascadia Code", 11, "bold"), text_color="#67e8f9", padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=formula, font=("Cascadia Code", 11, "bold"), text_color="#67e8f9", padx=10).pack(side=self._an_side())
             else:
                 self._analysis_tile(row, ch, "#64748b")
-                ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side=self._an_side())
     def _analyze_vigenere(self, text, operation):
         T = self._T
         alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
@@ -1037,7 +1135,7 @@ class AnalysisViewMixin:
         if letters:
             key_row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
             key_row.pack(fill="x", padx=8, pady=(6, 0))
-            ctk.CTkLabel(key_row, text="Key:", font=("Segoe UI", 11, "bold"), text_color=T["TEXT_GRAY"]).pack(side="left", padx=2)
+            ctk.CTkLabel(key_row, text=self._L("المفتاح:", "Key:"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_GRAY"]).pack(side=self._an_side(), padx=2)
             for _, _, ki_i in letters:
                 kv = key[ki_i % len(key)]
                 self._analysis_tile(key_row, kv, "#f59e0b", size=16, width=38, height=38)
@@ -1055,12 +1153,13 @@ class AnalysisViewMixin:
             m2_title = ctk.CTkLabel(
                 self.analysis_content,
                 text=self._L(
-                    f"شريط الإزاحة لكل حرف ({len(letters)}/{len(letters)}):",
+                    f"شريط الإزاحة لكل حرف ({self._ar_num(len(letters))} / {self._ar_num(len(letters))}):",
                     f"Shift strip for each letter ({len(letters)}/{len(letters)}):"
                 ),
                 font=("Segoe UI", 11, "bold"),
                 text_color="#fcd34d",
-                anchor="w"
+                anchor=self._an_anchor(),
+                justify=self._an_justify()
             )
             m2_title.pack(fill="x", padx=10, pady=(12, 2))
             for sidx, sch, ski in letters:
@@ -1081,7 +1180,7 @@ class AnalysisViewMixin:
         for i, ch in enumerate(u):
             row = ctk.CTkFrame(self.analysis_content, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=4)
-            ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side="left", padx=2)
+            ctk.CTkLabel(row, text=ch, font=("Segoe UI", 18, "bold"), text_color=T["TEXT_GRAY"], width=44, fg_color=T["BG_INPUT"], corner_radius=8).pack(side=self._an_side(), padx=2)
             self._analysis_arrow(row, "#f59e0b")
             p = index_map.get(ch)
             if p is not None:
@@ -1095,10 +1194,10 @@ class AnalysisViewMixin:
                     c = (p - k) % modulus
                     formula = f"({p} - {k}) {mod_label} = {c}"
                 self._analysis_tile(row, alphabet[c], "#f59e0b")
-                ctk.CTkLabel(row, text=f"[{kv} {k}]  {formula}", font=("Cascadia Code", 11, "bold"), text_color="#fcd34d", padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=f"[{kv} {k}]  {formula}", font=("Cascadia Code", 11, "bold"), text_color="#fcd34d", padx=10).pack(side=self._an_side())
             else:
                 self._analysis_tile(row, ch, "#64748b")
-                ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=self._L("رمز غير أبجدي", "Non-alphabetic"), font=("Segoe UI", 11), text_color=T["TEXT_MUTED"], padx=10).pack(side=self._an_side())
     def _analyze_playfair(self, text, operation):
         key = self._analysis_key_raw(1)
         alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
@@ -1124,9 +1223,23 @@ class AnalysisViewMixin:
                     for c in range(cols):
                         if matrix[r][c] == ch:
                             highlight.add((r, c))
-        self._matrix_grid(matrix, highlight, base_color="#10b981")
+        self._matrix_grid(
+            matrix, highlight, base_color="#10b981",
+            side_note=(
+                self._L("حروف المفتاح المُبرزة", "Highlighted key letters"),
+                [(matrix[r][c], "#10b981") for r in range(rows) for c in range(cols) if (r, c) in highlight][:14],
+                self._L(f"شبكة {self._ar_num(rows)}×{self._ar_num(cols)} — {self._ar_num(rows * cols)} حرفًا", f"{rows}×{cols} grid — {rows * cols} letters"),
+            )
+        )
         processed = self._playfair_prepare(text, mode)
-        note = ctk.CTkLabel(self.analysis_content, text=self._L(f"النص المُجهّز: {processed}", f"Prepared text: {processed}"), font=("Cascadia Code", 12, "bold"), text_color="#059669", anchor="w")
+        note = ctk.CTkLabel(
+            self.analysis_content,
+            text=self._L(f"النص المُجهّز: {processed}", f"Prepared text: {processed}"),
+            font=("Cascadia Code", 12, "bold"),
+            text_color="#059669",
+            anchor=self._an_anchor(),
+            justify=self._an_justify()
+        )
         note.pack(fill="x", padx=10, pady=(6, 2))
         for i in range(0, len(processed), 2):
             if i + 1 < len(processed):
@@ -1166,7 +1279,7 @@ class AnalysisViewMixin:
         self._analysis_arrow(row_f, "#059669")
         self._analysis_tile(row_f, matrix[nr1][nc1], "#34d399", sub=f"{nr1},{nc1}", size=18, width=44, height=44)
         self._analysis_tile(row_f, matrix[nr2][nc2], "#34d399", sub=f"{nr2},{nc2}", size=18, width=44, height=44)
-        ctk.CTkLabel(row_f, text=rule, font=("Segoe UI", 11, "bold"), text_color="#059669", padx=10).pack(side="left")
+        ctk.CTkLabel(row_f, text=rule, font=("Segoe UI", 11, "bold"), text_color="#059669", padx=10).pack(side=self._an_side())
     def _analyze_hill(self, text, operation):
         alphabet, index_map, modulus, mod_label = self._alphabet_pack(text)
         mode = "AR" if modulus == 28 else "EN"
@@ -1190,12 +1303,20 @@ class AnalysisViewMixin:
             inv_det = CryptoCore.mod_inverse(det, modulus)
             self._analysis_note(
                 self._L(
-                    f"كُل زوج يُعامَل كمتجه [x, y] ويُضرب بالمصفوفة. للتشفير خذ ({mod_label})؛ للفك نوجد det = {det} ثم نفرّق على {inv_det} لأنه det\u00d7{inv_det} \u2261 1 ({mod_label}). لماذا يعمل؟ لأن {matrix[0][0]}\u00d7{inv_det}... إلخ تُنتج المصفوفة العكسية التي تُلغي الأولى بالضرب.",
+                    "كُل زوج يُعامَل كمُتَّجِه ثُنائيّ ويُضرب بالمصفوفة، ثم يُؤخذ حاصل الضرب داخل نطاق الأبجدية نفسه. المُحدِّد يملك مُعاكِساً الضربيّاً ولذلك توجد مصفوفة عكسية تُلغي التشفير بالضرب عند الفك.",
                     f"Each pair is treated as a vector [x, y] and multiplied by the matrix. To encrypt just take ({mod_label}); to decrypt we compute det = {det} then scale the inverse matrix by {inv_det} because det\u00d7{inv_det} \u2261 1 ({mod_label}). Why does it work? The scaled cofactors produce the inverse matrix that cancels the original by multiplication."
                 ),
                 "#ec4899",
                 "\U0001f9ee"
             )
+            # سطر معادلات لاتيني صافٍ (يبدأ بحرف لاتيني ⇒ اتجاه أساسه LTR) منفصل عن النثر العربي
+            ctk.CTkLabel(
+                self.analysis_content,
+                text=f"det = {det} \u00b7 det\u00d7{inv_det} \u2261 1 ({mod_label}) \u00b7 inverse = cofactors\u00d7{inv_det} {mod_label}",
+                font=("Cascadia Code", 11, "bold"),
+                text_color="#f472b6",
+                anchor="w"
+            ).pack(fill="x", padx=12, pady=(0, 3))
         except Exception:
             self._analysis_note(
                 self._L(
@@ -1213,12 +1334,13 @@ class AnalysisViewMixin:
         m2_title = ctk.CTkLabel(
             self.analysis_content,
             text=self._L(
-                f"أو بطريقة أخرى — رسم ضرب المصفوفة \u00d7 المتجه لكل زوج ({len(processed)//2} زوجاً):",
+                f"أو بطريقة أخرى — رسم ضرب المصفوفة في المُتَّجِه لكل زوج ({self._ar_num(len(processed) // 2)} أزواجاً):",
                 f"Or another way — the matrix \u00d7 vector multiplication for each pair ({len(processed)//2} pair{'s' if len(processed)//2 != 1 else ''}):"
             ),
             font=("Segoe UI", 11, "bold"),
             text_color="#f9a8d4",
-            anchor="w"
+            anchor=self._an_anchor(),
+            justify=self._an_justify()
         )
         m2_title.pack(fill="x", padx=10, pady=(12, 2))
         for vp in range(0, min(len(processed), 8), 2):
@@ -1260,7 +1382,7 @@ class AnalysisViewMixin:
             self._analysis_arrow(row, "#f472b6")
             self._analysis_tile(row, alphabet[c1], "#fb7185", size=18, width=44, height=44)
             self._analysis_tile(row, alphabet[c2], "#fb7185", size=18, width=44, height=44)
-            ctk.CTkLabel(row, text=formula + "  " + formula2, font=("Cascadia Code", 10, "bold"), text_color="#fda4af", padx=10).pack(side="left")
+            ctk.CTkLabel(row, text=formula + "  " + formula2, font=("Cascadia Code", 10, "bold"), text_color="#fda4af", padx=10).pack(side=self._an_side())
     def _analyze_diffiehellman(self, input_text, output_text):
         T = self._T
         try:
@@ -1308,8 +1430,8 @@ class AnalysisViewMixin:
             card.pack(fill="x", pady=4, padx=6)
             card.bind("<Enter>", lambda e, c=card, col=color: c.configure(border_color=col, border_width=2))
             card.bind("<Leave>", lambda e, c=card: c.configure(border_color=T["BORDER_COLOR"], border_width=1))
-            ctk.CTkLabel(card, text=title, font=("Segoe UI", 13, "bold"), text_color=color, anchor="w").pack(fill="x", padx=12, pady=(8, 2))
-            ctk.CTkLabel(card, text=desc, font=("Cascadia Code", 11), text_color=T["TEXT_LIGHT"], anchor="w", justify="left", wraplength=700).pack(fill="x", padx=12, pady=(0, 8))
+            ctk.CTkLabel(card, text=title, font=("Segoe UI", 13, "bold"), text_color=color, anchor=self._an_anchor(), justify=self._an_justify()).pack(fill="x", padx=12, pady=(8, 2))
+            ctk.CTkLabel(card, text=desc, font=("Cascadia Code", 11), text_color=T["TEXT_LIGHT"], anchor=self._an_anchor(), justify=self._an_justify(), wraplength=700).pack(fill="x", padx=12, pady=(0, 8))
         secret = ctk.CTkFrame(self.analysis_content, fg_color="#0e7490", corner_radius=14, height=70)
         secret.pack(fill="x", padx=6, pady=(10, 4))
         secret.pack_propagate(False)
@@ -1358,23 +1480,24 @@ class AnalysisViewMixin:
             "\U0001f510"
         )
         self._analysis_chips([
-            ("p", p, "#a78bfa", "\U0001d45d"),
-            ("q", q, "#a78bfa", "\U0001d45e"),
-            ("n", n, "#8b5cf6", "\U0001d45b"),
-            ("\u03c6(n)", phi, "#8b5cf6", "\u03c6"),
-            ("e", e, "#c4b5fd", "\U0001d452"),
-            ("d", d, "#ddd6fe", "\U0001d451"),
+            (self._L("عامل أول", "prime factor 1"), p, "#a78bfa", "\U0001d45d"),
+            (self._L("عامل ثانٍ", "prime factor 2"), q, "#a78bfa", "\U0001d45e"),
+            (self._L("الوحدة", "modulus"), n, "#8b5cf6", "\U0001d45b"),
+            (self._L("دالة أويلر", "totient"), phi, "#8b5cf6", "\u03c6"),
+            (self._L("أس التشفير", "public exponent"), e, "#c4b5fd", "\U0001d452"),
+            (self._L("الأس الخاص", "private exponent"), d, "#ddd6fe", "\U0001d451"),
         ])
         if operation == "encrypt":
             m2_title = ctk.CTkLabel(
                 self.analysis_content,
                 text=self._L(
-                    f"أو بطريقة أخرى — سلسلة القوة لكل حرف ({len(input_text)} حرفاً):",
+                    f"أو بطريقة أخرى — سلسلة القوة لكل حرف ({self._ar_num(len(input_text or ''))} حرفاً):",
                     f"Or another way — the modular-power chain for each character ({len(input_text)} chars):"
                 ),
                 font=("Segoe UI", 11, "bold"),
                 text_color="#c4b5fd",
-                anchor="w"
+                anchor=self._an_anchor(),
+                justify=self._an_justify()
             )
             m2_title.pack(fill="x", padx=10, pady=(12, 2))
             _rsa_max = 10
@@ -1382,7 +1505,7 @@ class AnalysisViewMixin:
             if len(input_text) > _rsa_max:
                 ctk.CTkLabel(self.analysis_content,
                     text=self._L(
-                        f"\u26a0\ufe0f \u062a\u0645 \u0639\u0631\u0636 \u0623\u0648\u0644 {_rsa_max} \u062d\u0631\u0648\u0641 \u0641\u0642\u0637 ({len(input_text)} \u0625\u062c\u0645\u0627\u0644\u064a\u0627\u064b) \u0644\u0644\u062d\u0641\u0627\u0638 \u0639\u0644\u0649 \u0627\u0644\u0633\u0631\u0639\u0629",
+                        f"\u26a0\ufe0f \u062a\u0645 \u0639\u0631\u0636 \u0623\u0648\u0644 {self._ar_num(_rsa_max)} \u062d\u0631\u0648\u0641 \u0641\u0642\u0637 ({self._ar_num(len(input_text))} \u0625\u062c\u0645\u0627\u0644\u064a\u0627\u064b) \u0644\u0644\u062d\u0641\u0627\u0638 \u0639\u0644\u0649 \u0627\u0644\u0633\u0631\u0639\u0629",
                         f"\u26a0\ufe0f Showing first {_rsa_max} of {len(input_text)} chars for performance"
                     ),
                     font=("Segoe UI", 10), text_color=T["WARNING"]
@@ -1397,18 +1520,19 @@ class AnalysisViewMixin:
                 self._analysis_tile(row, ch if ch.isprintable() else "\u25a1", "#7c3aed", sub=str(m), size=18, width=44, height=44)
                 self._analysis_arrow(row, "#a78bfa")
                 self._analysis_tile(row, str(c), "#f59e0b", size=18, width=52, height=44)
-                ctk.CTkLabel(row, text=f"{m}^{e} mod {n} = {c}", font=("Cascadia Code", 11, "bold"), text_color="#fcd34d", padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=f"{m}^{e} mod {n} = {c}", font=("Cascadia Code", 11, "bold"), text_color="#fcd34d", padx=10).pack(side=self._an_side())
         else:
             nums = [int(x) for x in re.findall(r"\d+", input_text)]
             m2_title = ctk.CTkLabel(
                 self.analysis_content,
                 text=self._L(
-                    f"أو بطريقة أخرى — سلسلة القوة لكل رقم مشفّر ({len(nums)} رقماً):",
+                    f"أو بطريقة أخرى — سلسلة القوة لكل رقم مشفّر ({self._ar_num(len(nums))} رقماً):",
                     f"Or another way — the modular-power chain for each cipher number ({len(nums)} numbers):"
                 ),
                 font=("Segoe UI", 11, "bold"),
                 text_color="#6ee7b7",
-                anchor="w"
+                anchor=self._an_anchor(),
+                justify=self._an_justify()
             )
             m2_title.pack(fill="x", padx=10, pady=(12, 2))
             for c in nums:
@@ -1420,7 +1544,7 @@ class AnalysisViewMixin:
                 self._analysis_tile(row, str(c), "#f59e0b", size=16, width=52, height=44)
                 self._analysis_arrow(row, "#34d399")
                 self._analysis_tile(row, ch, "#10b981", sub=str(m), size=18, width=44, height=44)
-                ctk.CTkLabel(row, text=f"{c}^{d} mod {n} = {m} \u2192 '{ch}'", font=("Cascadia Code", 11, "bold"), text_color="#6ee7b7", padx=10).pack(side="left")
+                ctk.CTkLabel(row, text=f"{c}^{d} mod {n} = {m} \u2192 '{ch}'", font=("Cascadia Code", 11, "bold"), text_color="#6ee7b7", padx=10).pack(side=self._an_side())
 
     def _analyze_sdes(self, input_text, output_text, operation):
         key = self._analysis_key_raw(1).strip().replace(' ', '')
@@ -1429,7 +1553,7 @@ class AnalysisViewMixin:
             K1, K2 = CryptoCore.sdes_keygen(key)
         except Exception:
             self._analysis_hero(
-                self._L("\U0001f9ed شفرة S-DES", "\U0001f9ed S-DES Cipher"),
+                self._L("شفرة S-DES", "S-DES Cipher"),
                 self._L("أدخل مفتاحًا صالحًا من 10 بت لرؤية التحليل", "Enter a valid 10-bit key to see the analysis"),
                 "#0ea5e9", "\U0001f9ed"
             )
@@ -1437,7 +1561,7 @@ class AnalysisViewMixin:
 
         color = "#0ea5e9"
         self._analysis_hero(
-            self._L("\U0001f9ed شفرة S-DES — خوارزمية كلاسيكية مبسّطة", "\U0001f9ed S-DES Cipher — Classic Simplified Algorithm"),
+            self._L("شفرة S-DES — خوارزمية كلاسيكية مبسّطة", "S-DES Cipher — Classic Simplified Algorithm"),
             self._L(
                 f"نص ثنائي: {pt or '………'} — المفتاح: {key} — عملية: {'تشفير' if operation == 'encrypt' else 'فك تشفير'}",
                 f"Binary text: {pt or '………'} — Key: {key} — Operation: {'Encrypt' if operation == 'encrypt' else 'Decrypt'}"
@@ -1445,11 +1569,11 @@ class AnalysisViewMixin:
             color, "\U0001f9ed"
         )
         self._analysis_chips([
-            ("K", key, "#7dd3fc", "\U0001d45d"),
-            ("K1", K1, "#38bdf8", "K1"),
-            ("K2", K2, "#0ea5e9", "K2"),
-            ("IP", self._perm_str(CryptoCore.SDES_IP), "#64748b", "IP"),
-            ("IP⁻¹", self._perm_str(CryptoCore.SDES_IP_INV), "#64748b", "IP⁻¹"),
+            (self._L("المفتاح الأصلي", "master key"), key, "#7dd3fc", "\U0001f511"),
+            (self._L("مفتاح فرعي أول", "subkey K1"), K1, "#38bdf8", "\U0001f501"),
+            (self._L("مفتاح فرعي ثانٍ", "subkey K2"), K2, "#0ea5e9", "\U0001f502"),
+            (self._L("التبديل الابتدائي", "IP"), self._perm_str(CryptoCore.SDES_IP), "#64748b", "\u25a6"),
+            (self._L("التبديل الختامي", "IP⁻¹"), self._perm_str(CryptoCore.SDES_IP_INV), "#64748b", "\u25a7"),
         ])
 
         self._analysis_note(
@@ -1498,9 +1622,8 @@ class AnalysisViewMixin:
             self._analysis_arrow(result_row, "#0ea5e9")
             self._analysis_tile(result_row, f"{R2 + L2}", "#334155", size=12, width=112, height=44)
             self._analysis_arrow(result_row, "#0ea5e9")
-            ctk.CTkLabel(result_row, text="→", font=("Segoe UI", 18, "bold"), text_color="#0ea5e9", width=26).pack(side="left", padx=2)
             self._analysis_tile(result_row, ct, "#0ea5e9", sub=operation, size=16, width=96, height=44)
-            ctk.CTkLabel(result_row, text=self._L("الناتج النهائي (8 بت)", "Final output (8 bits)"), font=("Segoe UI", 10, "bold"), text_color="#7dd3fc", padx=10).pack(side="left")
+            ctk.CTkLabel(result_row, text=self._L("الناتج النهائي (8 بت)", "Final output (8 bits)"), font=("Segoe UI", 10, "bold"), text_color="#7dd3fc", padx=10).pack(side=self._an_side())
 
         else:
             self._analysis_note(
@@ -1546,13 +1669,14 @@ class AnalysisViewMixin:
         return ','.join(str(x) for x in perm)
 
     def _analyze_des(self, input_text, output_text, operation):
+        T = self._T
         key = self._analysis_key_raw(1).strip().replace(' ', '')
         pt = input_text.strip().replace(' ', '')
         try:
             keys = CryptoCore.des_keygen(key)
         except Exception:
             self._analysis_hero(
-                self._L("\U0001f512 خوارزمية DES", "\U0001f512 DES Algorithm"),
+                self._L("خوارزمية DES", "DES Algorithm"),
                 self._L("أدخل مفتاحًا صالحًا من 64 بت لرؤية التحليل", "Enter a valid 64-bit key to see the analysis"),
                 "#f59e0b", "\U0001f512"
             )
@@ -1560,7 +1684,7 @@ class AnalysisViewMixin:
 
         color = "#f59e0b"
         self._analysis_hero(
-            self._L("\U0001f512 DES — معيار تشفير البيانات", "\U0001f512 DES — Data Encryption Standard"),
+            self._L("DES — معيار تشفير البيانات", "DES — Data Encryption Standard"),
             self._L(
                 f"نص ثنائي: {pt or '………'} — المفتاح: {key[:15]}… — 16 جولة Feistel — {'تشفير' if operation == 'encrypt' else 'فك تشفير'}",
                 f"Binary text: {pt or '………'} — Key: {key[:15]}… — 16 Feistel rounds — {'Encrypt' if operation == 'encrypt' else 'Decrypt'}"
@@ -1568,11 +1692,11 @@ class AnalysisViewMixin:
             color, "\U0001f512"
         )
         self._analysis_chips([
-            ("K\u2080", key[:8], "#fcd34d", "\U0001d45d"),
-            ("K\u2081", keys[0], "#f59e0b", "K1"),
-            ("K\u2081\u2086", keys[-1], "#f59e0b", "K16"),
-            ("Effective", "56 bit", "#fb923c", "56"),
-            ("Rounds", "16", "#fcd34d", "16"),
+            (self._L("المفتاح الأصلي", "master key"), key[:8], "#fcd34d", "\U0001f511"),
+            (self._L("مفتاح الجولة الأول", "first subkey"), keys[0], "#f59e0b", "K\u2081"),
+            (self._L("مفتاح الجولة السادس عشر", "last subkey"), keys[-1], "#f59e0b", "K\u2081\u2086"),
+            (self._L("بت فعّالة", "bits effective"), "56 / 64", "#fb923c", "\U0001f50c"),
+            (self._L("جولات فيستل", "Feistel rounds"), self._ar_num(16) if self.language_manager.is_rtl else "16", "#fcd34d", "\U0001f501"),
         ])
 
         self._analysis_note(
@@ -1603,13 +1727,23 @@ class AnalysisViewMixin:
                 "\U0001f4ca ملخص الــ 16 جولة (L / R بعد كل جولة)",
                 "\U0001f4ca All 16 rounds summary (L / R after each round)"
             ), font=("Segoe UI", 13, "bold"), text_color="#fcd34d").pack(anchor="w", padx=12, pady=(8, 2))
+            header_row = ctk.CTkFrame(tbl, fg_color="transparent")
+            header_row.pack(fill="x", padx=12, pady=(0, 1))
+            for htext, hw in (
+                (self._L("الجولة", "Round"), 40),
+                (self._L("النصف الأيسر", "Left half"), 260),
+                (self._L("النصف الأيمن", "Right half"), 260),
+                ("⊕ " + self._L("المفتاح", "Key"), 62),
+            ):
+                ctk.CTkLabel(header_row, text=htext, font=("Segoe UI", 9, "bold"), text_color=T["TEXT_GRAY"], width=hw, anchor="w").pack(side="left")
+            ctk.CTkFrame(tbl, height=1, fg_color=T["BORDER_COLOR"]).pack(fill="x", padx=12, pady=(0, 3))
             for i, lv, rv, fk in rounds:
                 row = ctk.CTkFrame(tbl, fg_color="transparent")
                 row.pack(fill="x", padx=12, pady=1)
-                ctk.CTkLabel(row, text=f"R{i}", font=("Cascadia Code", 10, "bold"), text_color="#f59e0b", width=34, anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=lv, font=("Cascadia Code", 9), text_color="#ffffff", width=250, anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=rv, font=("Cascadia Code", 9), text_color="#ffffff", width=250, anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=self._L(f"K{i} ⊕", f"K{i} ⊕"), font=("Cascadia Code", 9, "bold"), text_color="#fbbf24", width=40, anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=f"R{i}", font=("Cascadia Code", 10, "bold"), text_color="#f59e0b", width=40, anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=lv, font=("Cascadia Code", 9), text_color="#ffffff", width=260, anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=rv, font=("Cascadia Code", 9), text_color="#ffffff", width=260, anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=self._L(f"K{i} ⊕", f"K{i} ⊕"), font=("Cascadia Code", 9, "bold"), text_color="#fbbf24", width=62, anchor="w").pack(side="left")
             ctk.CTkLabel(tbl, text=self._L(
                 f"قبل FP: R16|L16 = {R + L}",
                 f"Pre-FP: R16|L16 = {R + L}"
@@ -1642,7 +1776,7 @@ class AnalysisViewMixin:
             self._analysis_tile(res, f"{R + L}", "#334155", size=10, width=330, height=44)
             self._analysis_arrow(res, "#f59e0b")
             self._analysis_tile(res, ct, "#f59e0b", sub=operation, size=13, width=330, height=44)
-            ctk.CTkLabel(res, text=self._L("الناتج النهائي (64 بت)", "Final output (64 bits)"), font=("Segoe UI", 10, "bold"), text_color="#fcd34d", padx=10).pack(side="left")
+            ctk.CTkLabel(res, text=self._L("الناتج النهائي (64 بت)", "Final output (64 bits)"), font=("Segoe UI", 10, "bold"), text_color="#fcd34d", padx=10).pack(side=self._an_side())
 
         else:
             self._analysis_note(

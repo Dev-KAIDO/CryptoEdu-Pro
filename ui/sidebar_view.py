@@ -56,13 +56,13 @@ class SidebarViewMixin:
         lang_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         lang_section.pack(pady=10, padx=20, fill="x")
 
-        ctk.CTkLabel(
+        self._sidebar_lang_label = ctk.CTkLabel(
             lang_section,
             text="\U0001f310 " + self.language_manager.current["language"],
             font=("Segoe UI", 11),
             text_color=T["TEXT_GRAY"]
-        ).pack(anchor="w", pady=(0, 8))
-
+        )
+        self._sidebar_lang_label.pack(anchor="w", pady=(0, 8))
         self.lang_btn = ctk.CTkSegmentedButton(
             lang_section,
             values=["AR", "EN"],
@@ -82,12 +82,13 @@ class SidebarViewMixin:
         theme_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         theme_section.pack(pady=5, padx=20, fill="x")
 
-        ctk.CTkLabel(
+        self._sidebar_theme_label = ctk.CTkLabel(
             theme_section,
-            text="\U0001f3a8 Theme",
+            text="\U0001f3a8 " + (self._L("المظهر", "Theme") if hasattr(self, "_L") else ("المظهر" if self.language_manager.is_rtl else "Theme")),
             font=("Segoe UI", 11),
             text_color=T["TEXT_GRAY"]
-        ).pack(anchor="w", pady=(0, 8))
+        )
+        self._sidebar_theme_label.pack(anchor="w", pady=(0, 8))
 
         self.theme_menu = ctk.CTkOptionMenu(
             theme_section,
@@ -109,17 +110,18 @@ class SidebarViewMixin:
         cipher_section = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         cipher_section.pack(pady=5, padx=20, fill="x")
 
-        ctk.CTkLabel(
+        self._sidebar_cipher_label = ctk.CTkLabel(
             cipher_section,
             text="\u2699\ufe0f " + self.language_manager.current["select_cipher"],
             font=("Segoe UI", 11),
             text_color=T["TEXT_GRAY"]
-        ).pack(anchor="w", pady=(0, 8))
+        )
+        self._sidebar_cipher_label.pack(anchor="w", pady=(0, 8))
 
         self.cipher_menu = ctk.CTkOptionMenu(
             cipher_section,
-            values=list(algorithm_names()),
-            command=self.change_cipher,
+            values=[self._cipher_display(name) for name in algorithm_names()],
+            command=self._on_cipher_menu_choice,
             font=("Segoe UI", 14, "bold"),
             fg_color=T["PRIMARY"],
             button_color=T["PRIMARY_DARK"],
@@ -128,7 +130,7 @@ class SidebarViewMixin:
             dropdown_hover_color=T["BG_CARD_HOVER"],
             height=40
         )
-        self.cipher_menu.set(self.current_cipher)
+        self.cipher_menu.set(self._cipher_display(self.current_cipher))
         self.cipher_menu.pack(fill="x")
         # === 🔎 بحث سريع عن الشفرة ===
         self.cipher_search = ctk.CTkEntry(
@@ -167,8 +169,7 @@ class SidebarViewMixin:
         self.operations_card.pack(fill="x", pady=5)
 
         ctk.CTkLabel(self.operations_card, text="\U0001f4ca", font=("Segoe UI", 14)).pack(side="left", padx=10, pady=8)
-        ops_text = "عمليات" if self.language_manager.is_rtl else "operations"
-        self.ops_label = ctk.CTkLabel(self.operations_card, text=f"0 {ops_text}", font=("Segoe UI", 11), text_color=T["TEXT_GRAY"])
+        self.ops_label = ctk.CTkLabel(self.operations_card, text=self._ops_label_text(), font=("Segoe UI", 11), text_color=T["TEXT_GRAY"])
         self.ops_label.pack(side="left", pady=8)
 
         # === زر الاختبار السريع ===
@@ -190,7 +191,8 @@ class SidebarViewMixin:
 
         history_header = ctk.CTkFrame(self.history_frame, fg_color="transparent")
         history_header.pack(fill="x", padx=10, pady=(8, 2))
-        ctk.CTkLabel(history_header, text="\U0001f4cb " + ("السجل" if self.language_manager.is_rtl else "History"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_LIGHT"]).pack(side="left")
+        self._sidebar_history_label = ctk.CTkLabel(history_header, text="\U0001f4cb " + ("السجل" if self.language_manager.is_rtl else "History"), font=("Segoe UI", 11, "bold"), text_color=T["TEXT_LIGHT"])
+        self._sidebar_history_label.pack(side="left")
         self.history_clear_btn = ctk.CTkButton(history_header, text="\U0001f5d1\ufe0f", width=25, height=25, font=("Segoe UI", 10), fg_color="transparent", hover_color=T["ERROR"], command=self._clear_history)
         self.history_clear_btn.pack(side="right")
 
@@ -211,6 +213,62 @@ class SidebarViewMixin:
             height=35
         )
         help_btn.pack(fill="x", pady=5)
+    # === 🔎 أسماء العرض للشفرات حسب اللغة ===
+    def _cipher_display(self, name):
+        try:
+            return self.language_manager.current.get(name.lower(), name)
+        except Exception:
+            return name
+
+    def _ops_label_text(self):
+        ops_text = "عمليات" if self.language_manager.is_rtl else "operations"
+        count = getattr(self, "operations_count", 0)
+        return f"{count} {ops_text}"
+
+    def _on_cipher_menu_choice(self, display_name):
+        self.change_cipher(self._cipher_canonical(display_name))
+
+    def _cipher_canonical(self, display_name):
+        for name in algorithm_names():
+            if self._cipher_display(name) == display_name:
+                return name
+        return display_name
+
+    def _refresh_cipher_menu(self):
+        if not hasattr(self, "cipher_menu"):
+            return
+        try:
+            self.cipher_menu.configure(values=[self._cipher_display(n) for n in algorithm_names()])
+            self.cipher_menu.set(self._cipher_display(self.current_cipher))
+        except Exception:
+            pass
+
+    def _refresh_sidebar_texts(self):
+        """تحديث نصوص الشريط الجانبي عند تغيير اللغة (كانت تُبنى مرة واحدة فقط)."""
+        try:
+            current = self.language_manager.current
+            is_rtl = self.language_manager.is_rtl
+            if hasattr(self, "_sidebar_lang_label"):
+                self._sidebar_lang_label.configure(text="\U0001f310 " + current["language"])
+            if hasattr(self, "_sidebar_theme_label"):
+                self._sidebar_theme_label.configure(text="\U0001f3a8 " + (self._L("المظهر", "Theme") if hasattr(self, "_L") else ("المظهر" if is_rtl else "Theme")))
+            if hasattr(self, "_sidebar_cipher_label"):
+                self._sidebar_cipher_label.configure(text="\u2699\ufe0f " + current["select_cipher"])
+            if hasattr(self, "cipher_search"):
+                self.cipher_search.configure(placeholder_text=self._L("🔎 اكتب للبحث عن شفرة…", "🔎 Type to search a cipher…"))
+            if hasattr(self, "cipher_info_label"):
+                self.cipher_info_label.configure(
+                    text=current[f"desc_{self.current_cipher.lower()}"],
+                    justify="right" if is_rtl else "left"
+                )
+            if hasattr(self, "ops_label"):
+                self.ops_label.configure(text=self._ops_label_text())
+            if hasattr(self, "_sidebar_history_label"):
+                self._sidebar_history_label.configure(text="\U0001f4cb " + ("السجل" if is_rtl else "History"))
+            self._refresh_cipher_menu()
+        except Exception:
+            pass
+
     # === 🔎 نتائج البحث عن الشفرات ===
     def _filter_cipher_results(self, event=None):
         try:
@@ -245,7 +303,7 @@ class SidebarViewMixin:
             ctk.CTkButton(
                 frame,
                 text="🔐 " + display,
-                anchor="w",
+                anchor="e" if self.language_manager.is_rtl else "w",
                 height=28,
                 font=("Segoe UI", 11),
                 fg_color=T["BG_CARD"],
@@ -271,5 +329,5 @@ class SidebarViewMixin:
         except Exception:
             pass
         if hasattr(self, "cipher_menu"):
-            self.cipher_menu.set(name)
+            self.cipher_menu.set(self._cipher_display(name))
         self.change_cipher(name)

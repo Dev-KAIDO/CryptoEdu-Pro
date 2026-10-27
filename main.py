@@ -416,6 +416,27 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
         self.update_keys()
         self._update_code_labels()
         self.status_bar.set_status(self.language_manager.current["status_ready"])
+        # إعادة تخطيط صف أزرار العمليات وشريط الإحصاءات ونصوص الشريط الجانبي للاتجاه الجديد
+        try:
+            self._layout_main_buttons()
+        except Exception:
+            pass
+        try:
+            self._refresh_sidebar_texts()
+        except Exception:
+            pass
+        try:
+            self.after(90, self._update_text_stats)
+        except Exception:
+            pass
+        # زر العودة في صفحة التحليل: نصه ورسمة سهمه يتبعان اللغة الجديدة
+        try:
+            self.analysis_page_back.configure(
+                text=("\u2192  " if self.language_manager.is_rtl else "\u2190  ")
+                + self._L("العودة إلى التشفير", "Back to Encryption")
+            )
+        except Exception:
+            pass
 
     def change_cipher(self, new_cipher):
         get_algorithm(new_cipher)
@@ -423,8 +444,10 @@ class CryptoApp(SidebarViewMixin, AnalysisViewMixin, KeyFieldsMixin, CodeViewMix
             self.controller.cancel_current()
             self._set_crypto_controls_enabled(True)
         self.current_cipher = new_cipher
-        if hasattr(self, "cipher_menu") and self.cipher_menu.get() != new_cipher:
-            self.cipher_menu.set(new_cipher)
+        if hasattr(self, "cipher_menu") and hasattr(self, "_cipher_display"):
+            wanted = self._cipher_display(new_cipher)
+            if self.cipher_menu.get() != wanted:
+                self.cipher_menu.set(wanted)
         self._analysis_ready = False
         # ألغِ أي بناء تحليل مؤجل أو تجزئة عجلات قديمة حتى لا تُبني نتيجة خاطئة أو تختفي الواجهات
         self._cancel_deferred_analysis()
