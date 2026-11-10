@@ -19,6 +19,14 @@
 
 </div>
 
+<div align="center">
+
+<img src="docs/cryptoedu-icon.png" alt="CryptoEdu Pro desktop icon" width="76">
+
+<sub><strong>One visual language:</strong> the desktop icon, README mark, and Cyber Learning Lab cover share the same shield, key, blue, teal, and gold palette.</sub>
+
+</div>
+
 ---
 
 ## نظرة عامة
